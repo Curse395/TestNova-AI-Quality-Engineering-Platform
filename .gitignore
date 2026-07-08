@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.env
+
+
+# Node
+node_modules/
+dist/
+
+
+# IDE
+.vscode/
+
+
+# OS
+.DS_Store
+Thumbs.db
