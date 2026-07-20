@@ -1,6 +1,10 @@
 from sqlalchemy import Column, Integer, String,DateTime
 from app.database.connection import Base 
 from datetime import datetime
+from sqlalchemy.orm import relationship
+
+
+
 class User(Base):
 
     __tablename__="users"
@@ -29,3 +33,9 @@ class User(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+    organizations=relationship(
+        "Organization",
+        back_populates="owner"
+    )
+    
