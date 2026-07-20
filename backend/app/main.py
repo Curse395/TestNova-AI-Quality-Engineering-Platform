@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database.connection import Base,engine
-from app.models import user
-from app.api import auth
+
+from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads
+from app.database.connection import Base, engine
+from app.models import document, document_chunk, document_embedding, organization, project, user
 
 Base.metadata.create_all(bind=engine)
 
@@ -13,6 +14,12 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+app.include_router(projects.router)
+app.include_router(uploads.router)
+app.include_router(knowledge_base.router)
+app.include_router(document_processing.router)
+app.include_router(embeddings.router)
+app.include_router(retrieval.router)
 
 app.add_middleware(
     CORSMiddleware,
