@@ -9,6 +9,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 from app.database.connection import Base, SessionLocal, engine
 from app.main import app
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.document_embedding import DocumentEmbedding
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
@@ -27,7 +29,12 @@ def test_document_processing_pipeline():
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Processor", "email": "processor@example.com", "password": "securepass123"},
+        json={
+            "name": "Processor",
+            "email": "processor@example.com",
+            "password": "securepass123",
+            "workspace_name": "Processing Workspace",
+        },
     )
     assert register_response.status_code == 200
 
@@ -61,8 +68,42 @@ def test_document_processing_pipeline():
     )
     assert upload_response.status_code == 200
 
-    document_id = upload_response.json()["id"]
+    document_id = upload_response.json()["data"]["id"]
     process_response = client.post(f"/documents/{document_id}/process", headers=headers)
 
     assert process_response.status_code == 200
-    assert process_response.json()["chunk_count"] >= 1
+    payload = process_response.json()["data"]
+    assert payload["document_id"] == document_id
+    assert payload["chunks_created"] >= 1
+    assert payload["status"] == "completed"
+
+    db = SessionLocal()
+    try:
+        chunks = (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.document_id == document_id)
+            .order_by(DocumentChunk.chunk_index)
+            .all()
+        )
+        assert len(chunks) == payload["chunks_created"]
+        assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
+        assert all(chunk.content for chunk in chunks)
+        assert db.query(DocumentEmbedding).count() == 0
+    finally:
+        db.close()
+
+    # Reprocessing replaces the existing ingestion set instead of appending to it.
+    repeat_response = client.post(f"/documents/{document_id}/process", headers=headers)
+    assert repeat_response.status_code == 200
+    assert repeat_response.json()["data"]["chunks_created"] == payload["chunks_created"]
+
+    db = SessionLocal()
+    try:
+        assert (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.document_id == document_id)
+            .count()
+            == payload["chunks_created"]
+        )
+    finally:
+        db.close()
