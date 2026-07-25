@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.responses import ApiResponse, success_response
 from app.database.connection import get_db
 from app.shemas.user_schema import UserCreate, UserLogin
 from app.services.auth_service import AuthService
@@ -12,7 +13,14 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def register(data: UserCreate, db: Session = Depends(get_db)) -> dict[str, object]:
     service = AuthService(db)
     try:
-        return service.register_user(data)
+        payload = service.register_user(data)
+        return {
+            "success": True,
+            "message": "Registration completed successfully",
+            "data": payload,
+            "errors": None,
+            **payload,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -21,6 +29,13 @@ def register(data: UserCreate, db: Session = Depends(get_db)) -> dict[str, objec
 def login(data: UserLogin, db: Session = Depends(get_db)) -> dict[str, object]:
     service = AuthService(db)
     try:
-        return service.login_user(data)
+        payload = service.login_user(data)
+        return {
+            "success": True,
+            "message": "Login completed successfully",
+            "data": payload,
+            "errors": None,
+            **payload,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc

@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads
+from app.core.exceptions import register_exception_handlers
+from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
 from app.models import document, document_chunk, document_embedding, organization, project, user
 
@@ -20,6 +22,7 @@ app.include_router(knowledge_base.router)
 app.include_router(document_processing.router)
 app.include_router(embeddings.router)
 app.include_router(retrieval.router)
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +35,4 @@ app.add_middleware(
 
 @app.get("/")
 def home():
-    return {
-        "message": "TestNova AI Backend Running 🚀"
-    }
+    return {"success": True, "message": "Service is healthy", "data": {"message": "TestNova AI Backend Running 🚀"}, "errors": None}

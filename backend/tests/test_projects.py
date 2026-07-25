@@ -52,7 +52,7 @@ def test_project_crud_and_dashboard_flow():
         headers=headers,
     )
     assert create_response.status_code == 200
-    project_id = create_response.json()["id"]
+    project_id = create_response.json()["data"]["id"]
 
     list_response = client.get("/projects/", headers=headers)
     assert list_response.status_code == 200

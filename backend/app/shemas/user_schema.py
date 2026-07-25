@@ -5,6 +5,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
+    workspace_name:str
 
 
 class UserLogin(BaseModel):

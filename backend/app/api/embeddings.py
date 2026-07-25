@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
+from app.core.responses import ApiResponse, success_response
 from app.database.connection import get_db
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
@@ -14,12 +15,12 @@ from app.services.embedding_service import EmbeddingService
 router = APIRouter(prefix="/embeddings", tags=["Embeddings"])
 
 
-@router.post("/regenerate", response_model=EmbeddingResponse)
+@router.post("/regenerate")
 def regenerate_embeddings(
     document_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
-) -> EmbeddingResponse:
+) -> ApiResponse:
     if document_id is not None:
         document = db.query(Document).join(Project).join(Organization).filter(Document.id == document_id).first()
         if not document:
@@ -32,4 +33,5 @@ def regenerate_embeddings(
 
     service = EmbeddingService(db)
     generated = service.generate_embeddings(chunk_ids)
-    return EmbeddingResponse(generated=generated)
+    payload = EmbeddingResponse(generated=generated).model_dump()
+    return {"success": True, "message": "Embeddings generated successfully", "data": payload, "errors": None, **payload}

@@ -17,6 +17,7 @@ class User(Base):
     name=Column(
         String
     )
+    
     email=Column(
         String,
         unique=True,

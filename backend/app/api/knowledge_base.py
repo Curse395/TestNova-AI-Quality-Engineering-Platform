@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
+from app.core.responses import ApiResponse, success_response
 from app.database.connection import get_db
 from app.models.document import Document
 from app.models.organization import Organization
@@ -16,7 +17,7 @@ def index_project_documents(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
-) -> dict[str, int]:
+) -> ApiResponse:
     project = (
         db.query(Project)
         .join(Organization)
@@ -33,7 +34,7 @@ def index_project_documents(
         if content:
             chunk_count += max(1, len(content.split()))
 
-    return {"project_id": project.id, "chunks": chunk_count}
+    return {"success": True, "message": "Knowledge base indexed successfully", "data": {"project_id": project.id, "chunks": chunk_count}, "errors": None, "project_id": project.id, "chunks": chunk_count}
 
 
 @router.get("")
@@ -42,7 +43,7 @@ def search_project_documents(
     query: str,
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
-) -> list[dict[str, str]]:
+) -> ApiResponse:
     project = (
         db.query(Project)
         .join(Organization)
@@ -65,7 +66,7 @@ def search_project_documents(
                 }
             )
 
-    return results
+    return {"success": True, "message": "Knowledge base search completed successfully", "data": results, "errors": None}
 
 
 def read_text_content(storage_path: str) -> str:

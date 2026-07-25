@@ -60,7 +60,7 @@ def test_upload_document_flow():
     )
 
     assert response.status_code == 200
-    assert response.json()["filename"] == "sample.txt"
+    assert response.json()["data"]["filename"] == "sample.txt"
 
     listing = client.get("/uploads/project/1", headers=headers)
     assert listing.status_code == 200

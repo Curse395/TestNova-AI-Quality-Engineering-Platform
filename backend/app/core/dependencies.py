@@ -3,24 +3,19 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.security import ALGORITHM, SECRET_KEY
 from app.database.connection import get_db
 from app.models.user import User
 
+security=HTTPBearer()
 
 def get_current_user(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> User:
-    authorization = request.headers.get("authorization")
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authentication required")
+    credentials:HTTPAuthorizationCredentials=Depends(security),
+    db: Session = Depends(get_db),):
 
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(status_code=401, detail="Invalid authentication scheme")
-
+    token=credentials.credentials
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as exc:

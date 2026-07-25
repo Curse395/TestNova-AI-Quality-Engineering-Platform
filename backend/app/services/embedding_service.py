@@ -26,14 +26,14 @@ class EmbeddingService:
 
             if SentenceTransformer is not None:
                 model = SentenceTransformer("all-MiniLM-L6-v2")
-                model.encode([chunk.content], normalize_embeddings=True)
+                embedding=model.encode(chunk.content, normalize_embeddings=True).tolist()
             else:
                 _ = chunk.content
 
             embedding_record = DocumentEmbedding(
                 chunk_id=chunk.id,
                 model_name="all-MiniLM-L6-v2",
-                embedding_text=chunk.content,
+                embedding=embedding,
             )
             self.db.add(embedding_record)
             count += 1

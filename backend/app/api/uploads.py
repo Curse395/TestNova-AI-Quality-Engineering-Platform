@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
+from app.core.responses import ApiResponse, success_response
 from app.database.connection import get_db
 from app.models.document import Document
 from app.models.organization import Organization
@@ -16,13 +17,13 @@ UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
 
 
-@router.post("/", response_model=DocumentUploadResponse)
+@router.post("/")
 def upload_document(
     project_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
-) -> DocumentUploadResponse:
+) -> ApiResponse:
     project = (
         db.query(Project)
         .join(Organization)
@@ -49,21 +50,22 @@ def upload_document(
     db.commit()
     db.refresh(document)
 
-    return DocumentUploadResponse(
+    payload = DocumentUploadResponse(
         id=document.id,
         filename=document.filename,
         content_type=document.content_type,
         storage_path=document.storage_path,
         project_id=document.project_id,
-    )
+    ).model_dump()
+    return {"success": True, "message": "Document uploaded successfully", "data": payload, "errors": None, **payload}
 
 
-@router.get("/project/{project_id}", response_model=list[DocumentUploadResponse])
+@router.get("/project/{project_id}")
 def list_documents(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
-) -> list[DocumentUploadResponse]:
+) -> ApiResponse:
     project = (
         db.query(Project)
         .join(Organization)
@@ -74,13 +76,13 @@ def list_documents(
         raise HTTPException(status_code=404, detail="Project not found")
 
     documents = db.query(Document).filter(Document.project_id == project.id).all()
-    return [
+    return {"success": True, "message": "Documents retrieved successfully", "data": [
         DocumentUploadResponse(
             id=document.id,
             filename=document.filename,
             content_type=document.content_type,
             storage_path=document.storage_path,
             project_id=document.project_id,
-        )
+        ).model_dump()
         for document in documents
-    ]
+    ], "errors": None}

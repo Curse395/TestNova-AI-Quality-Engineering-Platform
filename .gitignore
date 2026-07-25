@@ -23,3 +23,20 @@ backend/app/uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Test databases
+*.db
+
+# Patch / review files
+*.diff
+
+# Temporary inspection files
+inspect_response.py
+inspect_responses.py
+
+# Python cache
+.pytest_cache/
+
+# Virtual environments
+myenv/
+.venv/

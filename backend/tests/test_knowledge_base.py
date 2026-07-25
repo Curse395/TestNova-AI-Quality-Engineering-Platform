@@ -62,7 +62,7 @@ def test_knowledge_base_index_and_search():
 
     index_response = client.post("/projects/1/knowledge-base/index", headers=headers)
     assert index_response.status_code == 200
-    assert index_response.json()["chunks"] >= 1
+    assert index_response.json()["data"]["chunks"] >= 1
 
     search_response = client.get("/projects/1/knowledge-base?query=regression", headers=headers)
     assert search_response.status_code == 200

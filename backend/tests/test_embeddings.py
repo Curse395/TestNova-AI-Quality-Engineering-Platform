@@ -29,7 +29,12 @@ def test_embedding_regeneration_flow(monkeypatch):
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Embedding User", "email": "embeddings@example.com", "password": "securepass123"},
+        json={
+            "name": "Embedding User",
+            "email": "embeddings@example.com",
+            "password": "securepass123",
+            "workspace_name": "Embedding Workspace",
+        },
     )
     assert register_response.status_code == 200
 
@@ -63,7 +68,7 @@ def test_embedding_regeneration_flow(monkeypatch):
     )
     assert upload_response.status_code == 200
 
-    document_id = upload_response.json()["id"]
+    document_id = upload_response.json()["data"]["id"]
     process_response = client.post(f"/documents/{document_id}/process", headers=headers)
     assert process_response.status_code == 200
 
@@ -76,4 +81,4 @@ def test_embedding_regeneration_flow(monkeypatch):
 
     regenerate_response = client.post(f"/embeddings/regenerate?document_id={document_id}", headers=headers)
     assert regenerate_response.status_code == 200
-    assert regenerate_response.json()["generated"] >= 1
+    assert regenerate_response.json()["data"]["generated"] >= 1

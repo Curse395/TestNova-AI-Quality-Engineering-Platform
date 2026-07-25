@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-
+from app.models.organization import Organization
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.shemas.user_schema import UserCreate, UserLogin, UserResponse
@@ -23,6 +23,14 @@ class AuthService:
         self.db.commit()
         self.db.refresh(user)
 
+        organization=Organization(
+            name=data.workspace_name,
+            owner_id=user.id,
+        )
+        self.db.add(organization)
+        self.db.commit()
+        self.db.refresh(organization)
+
         return {
             "message": "Account successfully created",
             "user": UserResponse(
@@ -30,6 +38,10 @@ class AuthService:
                 name=user.name,
                 email=user.email,
             ),
+            "workspace":{
+                "id":organization.id,
+                "name":organization.name,
+            },
         }
 
     def login_user(self, data: UserLogin) -> dict[str, object]:
