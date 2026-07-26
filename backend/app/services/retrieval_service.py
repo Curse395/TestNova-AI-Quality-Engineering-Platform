@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-
+from app.services.model_service import ModelService
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
@@ -21,35 +21,38 @@ class RetrievalService:
         if not project:
             raise ValueError("Project not found")
 
-        documents = self.db.query(Document).filter(Document.project_id == project.id).all()
-        if not documents:
-            return []
+        model=ModelService.get_embedding_model()
+        query_embedding=model.encode(query,normalize_embeddings=True).tolist()
 
-        chunks = (
-            self.db.query(DocumentChunk)
-            .join(Document)
-            .filter(Document.project_id == project.id)
-            .order_by(DocumentChunk.chunk_index.asc())
-            .all()
-        )
+        results = (
+    self.db.query(
+        DocumentChunk,
+        DocumentEmbedding.embedding.cosine_distance(query_embedding).label("score")
+    )
+    .join(DocumentEmbedding, DocumentEmbedding.chunk_id == DocumentChunk.id)
+    .join(Document, Document.id == DocumentChunk.document_id)
+    .filter(Document.project_id == project.id)
+    .order_by(
+        DocumentEmbedding.embedding.cosine_distance(query_embedding)
+    )
+    .limit(limit)
+    .all()
+)
 
-        scored: list[tuple[float, DocumentChunk]] = []
-        normalized_query = query.lower()
-        for chunk in chunks:
-            content = (chunk.content or "").lower()
-            score = content.count(normalized_query) if normalized_query else 0.0
-            if score > 0:
-                scored.append((float(score), chunk))
+        print("\n========RESULTS===============")
+        print(results)
+        print("================================")
 
-        scored.sort(key=lambda item: item[0], reverse=True)
-        selected = scored[:limit]
+
+
+        
         return [
             {
                 "chunk_id": chunk.id,
                 "document_id": chunk.document_id,
                 "content": chunk.content,
-                "score": score,
-                "has_embedding": self.db.query(DocumentEmbedding).filter(DocumentEmbedding.chunk_id == chunk.id).first() is not None,
+                "score": float(score),
+                "has_embedding": True,
             }
-            for score, chunk in selected
+            for chunk, score in results
         ]
