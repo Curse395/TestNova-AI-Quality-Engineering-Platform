@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads
+from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat
 from app.core.exceptions import register_exception_handlers
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
@@ -15,6 +15,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.include_router(chat.router)
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(uploads.router)
