@@ -27,6 +27,7 @@ class RetrievalService:
         results = (
     self.db.query(
         DocumentChunk,
+        Document,
         DocumentEmbedding.embedding.cosine_distance(query_embedding).label("score")
     )
     .join(DocumentEmbedding, DocumentEmbedding.chunk_id == DocumentChunk.id)
@@ -50,9 +51,10 @@ class RetrievalService:
             {
                 "chunk_id": chunk.id,
                 "document_id": chunk.document_id,
+                "document_name": document.filename,
                 "content": chunk.content,
                 "score": float(score),
                 "has_embedding": True,
             }
-            for chunk, score in results
+            for chunk, document, score in results
         ]

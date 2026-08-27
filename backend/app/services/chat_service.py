@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.services.retrieval_service import RetrievalService
 from app.services.context_builder_service import ContextBuilderService
 from app.services.llm_services import LLMService 
+from app.services.prompt_builder_service import PromptBuilderService
 
 class ChatService:
 
@@ -10,6 +11,7 @@ class ChatService:
         self.retrieval_service=RetrievalService(db)
         self.context_builder=ContextBuilderService()
         self.llm_service=LLMService()
+        self.prompt_builder=PromptBuilderService()
 
     def chat(self,current_user_id:int,project_id:int,question:str):
 
@@ -20,20 +22,22 @@ class ChatService:
 
         context_payload=self.context_builder.build_context(retrived_chunks)
 
-        system_prompt=f"""
-You are TestNov AI.
+        system_prompt,user_prompt=self.prompt_builder.build_prompt(context=context_payload["context"],question=question)
 
-you are an AI Quality Engineering Assistant.
-
-Answer ONLY using the provided project documntation.
-if the answer is not available in the documentation, clearly say: 
-    ' I couldn't find this information in the uploaded project documents.
-    
-    Project COnext:
-    {context_payload["context"]}
-"""
-        return self.llm_service.generate_content(
+        response=self.llm_service.generate_content(
             system_prompt=system_prompt,
-            user_prompt=question,
+            user_prompt=user_prompt,
         )
+
+        return{ 
+            **response,
+            "sources":[{
+                "document_id": chunks["document_id"],
+                "document_name": chunks["document_name"],
+                "chunk_id":chunks["chunk_id"],
+                "score":chunks["score"]
+            }
+            for chunks in retrived_chunks
+            ]
+        }
 
