@@ -1,9 +1,12 @@
 from __future__ import annotations
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 from app.services.model_service import ModelService
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
+from app.models.document import Document
+from app.services.project_activity_service import ProjectActivityService
 
 
 
@@ -36,4 +39,17 @@ class EmbeddingService:
             count += 1
 
         self.db.commit()
+
+        if chunk_ids:
+            project_id=(self.db.query(Document.project_id).join(DocumentChunk,Document.id==DocumentChunk.document_id).filter(DocumentChunk.id.in_(chunk_ids)).distinct().first()[0])
+            document_count=(self.db.query(func.count(Document.id)).filter(Document.project_id==project_id).scalar())
+            chunk_count=(self.db.query(func.count(DocumentChunk.id)).join(Document, Document.id==DocumentChunk.document_id).filter(Document.project_id==project_id).scalar())
+            embedding_count=(self.db.query(func.count(DocumentEmbedding.id)).join(DocumentChunk, DocumentChunk.id==DocumentEmbedding.chunk_id).join(Document, Document.id==DocumentChunk.document_id).filter(Document.project_id==project_id).scalar())
+            ProjectActivityService(self.db).record_activity(project_id=project_id,documents=document_count,chunks=chunk_count,embeddings=embedding_count)
+            
+
+                
+                
+                
+                
         return count
