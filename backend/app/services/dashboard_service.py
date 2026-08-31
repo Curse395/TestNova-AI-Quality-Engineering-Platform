@@ -1,10 +1,12 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func 
+from sqlalchemy import func, desc
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
+from app.models.project_activity import ProjecActivity
+
 
 class DashboardService:
 
@@ -108,6 +110,29 @@ class DashboardService:
                 if len(assistant_suggestion)==0:
                     assistant_suggestion.append("Your workspace  is healthy. Consider generating a regression suite")
 
+                performance_trend=(self.db.query(ProjecActivity).filter(ProjecActivity.project_id.in_([p["id"] for p in active_projects])).order_by(ProjecActivity.created_at.asc()).all())
+
+                trend_data=[{
+                    "date":activity.created_at.isoformat(),
+                    "documents":activity.documents,
+                    "chunks":activity.chunks,
+                    "embedding":activity.embeddings
+                }
+                for activity in performance_trend]
+
+                knowledge_distribution=[{
+                    "name":"Documents",
+                    "value":total_documents
+                },
+                {
+                    "name":"Chunks",
+                    "value":total_chunks
+                },
+                {
+                    "name":"Embedding",
+                    "value":total_embeddings
+                }]
+
         return{
                     "active_projects":active_projects,
                     "quality_center":{
@@ -141,11 +166,10 @@ class DashboardService:
                         "coverage":overall_coverage
                     },
                     "risk":{
-                        "high":critical,
-                        "medium":needs_review,
-                        "low":healthy,
+                        "knowledge_distribution":knowledge_distribution
                     },
                     "assistant":{
                         "suggestions":assistant_suggestion
-                    }
+                    },
+                    "performance_trend":trend_data
                 }
