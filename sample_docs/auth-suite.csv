@@ -1,0 +1,13 @@
+test_id,feature,scenario,expected_result,priority
+AUTH_001,login,valid credentials,access token returned,high
+AUTH_002,login,invalid password,401 unauthorized message,high
+AUTH_003,login,locked account,account locked error,high
+AUTH_004,token,expired token,401 token expired,high
+AUTH_005,token,missing token,401 missing token,medium
+AUTH_006,refresh,valid refresh token,new access token issued,medium
+AUTH_007,refresh,reused refresh token,session terminated,medium
+AUTH_008,password reset,valid email,reset link sent,low
+AUTH_009,password reset,unknown email,generic error message,low
+AUTH_010,registration,duplicate email,email already in use error,high
+AUTH_011,registration,missing required fields,422 validation error,high
+AUTH_012,logout,active session,token revoked,medium

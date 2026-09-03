@@ -15,13 +15,6 @@ export const performanceData = [
   { name: 'Jun', coverage: 95, speed: 88 },
 ]
 
-export const bugTrendData = [
-  { name: 'API', value: 12 },
-  { name: 'UI', value: 8 },
-  { name: 'Flows', value: 5 },
-  { name: 'Perf', value: 3 },
-]
-
 export const projects = [
   { name: 'Atlas Commerce', status: 'Healthy', owner: 'Mina', progress: '92%' },
   { name: 'Northstar API', status: 'Needs review', owner: 'Jules', progress: '74%' },

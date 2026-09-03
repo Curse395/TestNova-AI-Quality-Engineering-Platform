@@ -1,0 +1,11 @@
+Release Notes - Version 4.3.0
+
+We are pleased to announce the release of version 4.3.0 of the TestNova AI Quality Engineering Platform. This release focuses on improving the reliability of the release pipeline, expanding the AI-powered test generation capabilities, and delivering a more intuitive dashboard experience for engineering teams.
+
+Highlights of this release include a redesigned release confidence score that combines knowledge health, healthy project percentage, and overall embedding coverage into a single weighted metric. Teams can now see at a glance whether their knowledge base is ready for release, whether more documentation coverage is needed, or whether additional processing is required before shipping. The new recommendation engine surfaces actionable guidance directly on the dashboard so that engineering managers and QA leads can quickly decide on the next steps.
+
+Additional improvements in this release cover the upload center, where teams can now upload plain text, CSV, JSON, PDF, and Word documents. Once uploaded, documents are parsed into chunks and can be converted into vector embeddings for semantic search and retrieval. The knowledge distribution pie chart on the dashboard now reflects the relationship between documents, chunks, and embeddings so teams can monitor ingestion progress at a glance.
+
+The performance trend chart provides a historical view of documents processed, chunks created, and embeddings generated over time. This helps teams understand how their knowledge base is growing and whether ingestion is keeping pace with project needs. Bug fixes in this release address edge cases in checkout flows, token refresh handling, and duplicate order creation prevention. Several improvements to address validation and error messaging were also included based on feedback from early adopters.
+
+This release notes document is intentionally written to span multiple paragraphs so that when it is processed it generates a substantial number of chunks. This makes it a great candidate for observing how changes in chunk totals and embedding coverage influence the release confidence calculation and the overall health of a project. Each processed document increases the document count, while each generated chunk increments the chunk count, and each embedding increments the embedding count used by the coverage formula.

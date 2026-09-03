@@ -11,3 +11,8 @@ def get_dashboard(current_user:CurrentUser,db:Session=Depends(get_db)):
     dashboard=DashboardService(db)
 
     return dashboard.get_dashboard(current_user_id=current_user.id)
+
+@router.get("/insights")
+def get_dashboard_insights(current_user:CurrentUser,db:Session=Depends(get_db)):
+    service=DashboardService(db)
+    return service.get_dashboard_insights(current_user.id)

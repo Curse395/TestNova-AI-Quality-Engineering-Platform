@@ -1,0 +1,38 @@
+{
+  "endpoint": "/api/v1/search",
+  "method": "POST",
+  "description": "Full-text and semantic search across the knowledge base.",
+  "authentication": "Bearer token required",
+  "request": {
+    "query": "How do I reset my password?",
+    "project_id": 1,
+    "top_k": 5,
+    "filters": {
+      "document_types": ["txt", "pdf", "docx"],
+      "date_from": "2026-01-01"
+    }
+  },
+  "response": {
+    "results": [
+      {
+        "chunk_id": 42,
+        "document_id": 7,
+        "score": 0.92,
+        "snippet": "To reset your password, open the account settings page...",
+        "metadata": {
+          "filename": "auth-suite.csv",
+          "content_type": "text/csv"
+        }
+      }
+    ],
+    "total_hits": 1,
+    "query_time_ms": 18
+  },
+  "error_codes": {
+    "400": "Invalid query parameter",
+    "401": "Missing or invalid token",
+    "404": "Project not found",
+    "503": "Embedding model unavailable"
+  },
+  "notes": "Search results are ranked by cosine similarity of embeddings. Queries are embedded using the same model as the documents for best matching quality."
+}

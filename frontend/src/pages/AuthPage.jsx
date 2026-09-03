@@ -1,10 +1,43 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import FormField from '../components/ui/FormField'
+import { apiClient } from '../api/client'
 
 const AuthPage = () => {
   const [mode, setMode] = useState('login')
+  const [form, setForm] = useState({ name: '', email: '', password: '', workspace_name: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
+
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register'
+      const payload =
+        mode === 'login'
+          ? { email: form.email, password: form.password }
+          : { name: form.name, email: form.email, password: form.password, workspace_name: form.workspace_name }
+
+      const res = await apiClient.post(endpoint, payload)
+      const token = res.data.access_token || res.data?.data?.access_token
+      if (token) {
+        localStorage.setItem('access_token', token)
+      }
+      navigate('/')
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.2),_transparent_40%),linear-gradient(135deg,_#020617,_#111827)] px-4 py-10 text-slate-100">
@@ -30,23 +63,31 @@ const AuthPage = () => {
             <div className="flex rounded-2xl border border-slate-800 bg-slate-950/70 p-1">
               <button
                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
-                onClick={() => setMode('login')}
+                onClick={() => { setMode('login'); setError('') }}
               >
                 Sign in
               </button>
               <button
                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
-                onClick={() => setMode('register')}
+                onClick={() => { setMode('register'); setError('') }}
               >
                 Create account
               </button>
             </div>
 
-            <form className="mt-7 space-y-4">
-              {mode === 'register' && <FormField label="Full name" placeholder="Jordan Lee" />}
-              <FormField label="Email" type="email" placeholder="you@company.com" />
-              <FormField label="Password" type="password" placeholder="••••••••" />
-              <Button className="w-full py-3">{mode === 'login' ? 'Sign in' : 'Create account'}</Button>
+            <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
+              {mode === 'register' && (
+                <>
+                  <FormField label="Full name" name="name" placeholder="Jordan Lee" value={form.name} onChange={handleChange} required />
+                  <FormField label="Workspace name" name="workspace_name" placeholder="Acme" value={form.workspace_name} onChange={handleChange} required />
+                </>
+              )}
+              <FormField label="Email" type="email" name="email" placeholder="you@company.com" value={form.email} onChange={handleChange} required />
+              <FormField label="Password" type="password" name="password" placeholder="••••••••" value={form.password} onChange={handleChange} required />
+              {error && <p className="text-sm text-rose-400">{error}</p>}
+              <Button className="w-full py-3" disabled={submitting}>
+                {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+              </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-500">
