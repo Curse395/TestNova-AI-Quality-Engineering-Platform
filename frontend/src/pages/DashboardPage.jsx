@@ -272,14 +272,24 @@ const DashboardPage = () => {
                   No suggestions right now.
                 </p>
               ) : (
-                safeData.assistant.suggestions.map((suggestion, index) => (
-                  <div key={index} className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
-                    <div className="rounded-xl bg-sky-500/10 p-2 text-sky-400"><Cpu size={16} /></div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-100">{suggestion}</p>
+                safeData.assistant.suggestions.map((suggestion, index) => {
+                  const title = typeof suggestion === 'string' ? suggestion : suggestion.title
+                  const description = typeof suggestion === 'object' ? suggestion.description : null
+                  const priority = typeof suggestion === 'object' ? suggestion.priority : null
+                  const priorityColor = priority === 'High' ? 'text-rose-400 bg-rose-500/10' : priority === 'Medium' ? 'text-amber-400 bg-amber-500/10' : 'text-sky-400 bg-sky-500/10'
+                  return (
+                    <div key={index} className="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
+                      <div className="rounded-xl bg-sky-500/10 p-2 text-sky-400"><Cpu size={16} /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-slate-100">{title}</p>
+                          {priority && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${priorityColor}`}>{priority}</span>}
+                        </div>
+                        {description && <p className="mt-1 text-sm text-slate-400">{description}</p>}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </Card>

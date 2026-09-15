@@ -3,6 +3,7 @@ class PromptBuilderService:
     def build_prompt(
             self,
             context:str,
+            conversation_history:str,
             question: str,
     ) -> tuple[str, str]:
 
@@ -27,7 +28,18 @@ Project Documentation:
 {context}
 """
 
-        user_prompt = question
+        user_prompt = f"""
+Previous Conversation: 
+{conversation_history}
+
+Current User Question:
+{question}
+
+Remember:
+- Use the previous conversation to understand follow-up questions.
+- Use the uploaded project documentation as the source of truth. 
+- If the documentation does not contain the answer, clearly say so.
+"""
 
         return system_prompt, user_prompt
 

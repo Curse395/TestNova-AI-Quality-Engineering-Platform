@@ -7,12 +7,14 @@ from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
 from app.models.project_activity import ProjecActivity
+from app.services.recomendation_service import RecommendationService
 
 
 class DashboardService:
 
     def __init__(self,db:Session):
         self.db=db
+        self.recommendation_service=RecommendationService(db)
 
     def get_dashboard(self, current_user_id:int):
         organizations=(self.db.query(Organization).filter(Organization.owner_id==current_user_id).all())
@@ -158,7 +160,7 @@ class DashboardService:
             "value":total_embeddings
         }]
 
-        return{
+        dashboard={
                     "active_projects":active_projects,
                     "quality_center":{
                         "release_confidence":release_confidence,
@@ -198,6 +200,9 @@ class DashboardService:
                     },
                     "performance_trend":trend_data
                 }
+        dashboard["assistant"]={"suggestions":self.recommendation_service.get_workspace_recomendations(dashboard)}
+
+        return dashboard
 
     def get_dashboard_insights(self,current_user_id:int):
 

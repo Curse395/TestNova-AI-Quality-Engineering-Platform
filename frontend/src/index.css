@@ -35,3 +35,37 @@ input {
 #root {
   min-height: 100vh;
 }
+
+/* ------------------------------------------------ */
+/*  Dark scrollbar (scoped to assistant panels)     */
+/* ------------------------------------------------ */
+.testnova-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90, 110, 150, 0.55) transparent;
+}
+
+.testnova-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.testnova-scroll::-webkit-scrollbar-track {
+  background: #0b1220;
+  border-radius: 999px;
+}
+
+.testnova-scroll::-webkit-scrollbar-thumb {
+  background: rgba(90, 110, 150, 0.45);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.testnova-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 110, 150, 0.75);
+  background-clip: content-box;
+}
+
+.testnova-scroll::-webkit-scrollbar-thumb:active {
+  background: #0ea5e9;
+  background-clip: content-box;
+}
