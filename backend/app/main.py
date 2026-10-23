@@ -5,7 +5,7 @@ from app.api import auth, document_processing, embeddings, knowledge_base, proje
 from app.core.exceptions import register_exception_handlers
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
-from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history
+from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session
 
 Base.metadata.create_all(bind=engine)
 

@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Navbar from '../components/layout/Navbar'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
-import { sendMessage, fetchChatHistory } from '../api/chat'
+import {
+  createChatSession,
+  fetchChatSession,
+  fetchChatSessions,
+  sendMessage,
+} from '../api/chat'
 import { fetchDashboard } from '../api/dashboard'
 import { apiClient } from '../api/client'
 
@@ -12,6 +17,25 @@ import { apiClient } from '../api/client'
 const SUGGESTION_PROMPTS = {
   generate_embeddings: 'What documents still need embeddings?',
   review_projects: 'Which projects need attention before release?',
+}
+
+function toChatMessages(history) {
+  if (!Array.isArray(history)) {
+    throw new Error('Unexpected chat history response.')
+  }
+
+  return [...history]
+    .sort((a, b) => {
+      const timeDifference = Date.parse(a.created_at) - Date.parse(b.created_at)
+      if (Number.isFinite(timeDifference) && timeDifference !== 0) {
+        return timeDifference
+      }
+      return a.id - b.id
+    })
+    .flatMap((entry) => [
+      { role: 'user', text: entry.question },
+      { role: 'assistant', text: entry.answer },
+    ])
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,13 +104,19 @@ const AssistantPage = () => {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [projects, setProjects] = useState([])
+  const [projectLoading, setProjectLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(true)
   const [suggestions, setSuggestions] = useState([])
   const [toast, setToast] = useState(null)
   const [selectedProject, setSelectedProject] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [activeSessionId, setActiveSessionId] = useState(null)
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const viewRequestIdRef = useRef(0)
+  const sendRequestIdRef = useRef(0)
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -96,60 +126,150 @@ const AssistantPage = () => {
     scrollToBottom()
   }, [messages, sending, scrollToBottom])
 
-  /* Load projects, suggestions, and chat history on mount */
+  const loadProjectConversation = useCallback(async (project, requestId) => {
+    try {
+      const projectSessions = await fetchChatSessions(project.id)
+      let availableSessions = projectSessions
+      if (availableSessions.length === 0) {
+        const session = await createChatSession(project.id)
+        availableSessions = [session]
+      }
+
+      if (requestId !== viewRequestIdRef.current) return
+      if (availableSessions.some((session) => session.project_id !== project.id)) {
+        throw new Error('A conversation did not match the selected project.')
+      }
+
+      setSessions(availableSessions)
+      const activeSession = availableSessions[0]
+      setActiveSessionId(activeSession.id)
+
+      const session = await fetchChatSession(project.id, activeSession.id)
+      if (requestId !== viewRequestIdRef.current) return
+      if (session.project_id !== project.id || session.id !== activeSession.id) {
+        throw new Error('The conversation did not match the selected project.')
+      }
+      setMessages(toChatMessages(session.messages))
+    } catch {
+      if (requestId === viewRequestIdRef.current) {
+        setSessions([])
+        setActiveSessionId(null)
+        setMessages([])
+        setToast('Could not load this project’s conversations. Please try again.')
+      }
+    } finally {
+      if (requestId === viewRequestIdRef.current) setHistoryLoading(false)
+    }
+  }, [])
+
+  /* Load authorized projects, suggestions, and the first project's conversation. */
   useEffect(() => {
     let cancelled = false
 
     async function init() {
       try {
-        const projRes = await apiClient.get('/projects/')
-        const projList = projRes.data?.data || []
-        if (cancelled) return
-
-        const activeProject = projList.length > 0 ? projList[0] : null
-        if (!activeProject) {
-          setHistoryLoading(false)
-          return
-        }
-        setSelectedProject(activeProject)
-
-        const [dashData, history] = await Promise.all([
+        const [projRes, dashData] = await Promise.all([
+          apiClient.get('/projects/'),
           fetchDashboard().catch(() => null),
-          fetchChatHistory(activeProject.id).catch(() => []),
         ])
-
+        const projList = projRes.data?.data
+        if (!Array.isArray(projList)) {
+          throw new Error('Unexpected project list response.')
+        }
         if (cancelled) return
 
+        setProjects(projList)
+        setProjectLoading(false)
         if (dashData?.assistant?.suggestions) {
           setSuggestions(dashData.assistant.suggestions)
         }
 
-        const sorted = [...history].sort(
-          (a, b) => new Date(a.created_at) - new Date(b.created_at),
-        )
-        setMessages(
-          sorted.flatMap((h) => [
-            { role: 'user', text: h.question },
-            { role: 'assistant', text: h.answer },
-          ]),
-        )
-      } catch (err) {
+        const activeProject = projList[0] || null
+        if (!activeProject) {
+          setSelectedProject(null)
+          setSessions([])
+          setActiveSessionId(null)
+          setMessages([])
+          setHistoryLoading(false)
+          return
+        }
+        setSelectedProject(activeProject)
+        const requestId = ++viewRequestIdRef.current
+        await loadProjectConversation(activeProject, requestId)
+      } catch {
         if (!cancelled) {
-          setToast('Could not load assistant data. Please try again later.')
+          setProjectLoading(false)
+          setHistoryLoading(false)
+          setMessages([])
+          setToast('Could not load your projects. Please try again.')
         }
       } finally {
-        if (!cancelled) setHistoryLoading(false)
+        if (!cancelled) setProjectLoading(false)
       }
     }
 
     init()
-    return () => { cancelled = true }
-  }, [])
+    return () => {
+      cancelled = true
+      viewRequestIdRef.current += 1
+      sendRequestIdRef.current += 1
+    }
+  }, [loadProjectConversation])
+
+  const handleSelectProject = async (event) => {
+    const projectId = Number(event.target.value)
+    const project = projects.find((item) => item.id === projectId)
+    if (!project || project.id === selectedProject?.id) return
+
+    const requestId = ++viewRequestIdRef.current
+    sendRequestIdRef.current += 1
+    setSending(false)
+    setSelectedProject(project)
+    setMessages([])
+    setSessions([])
+    setActiveSessionId(null)
+    setHistoryLoading(true)
+    setToast(null)
+    await loadProjectConversation(project, requestId)
+  }
+
+  const handleSelectSession = async (event) => {
+    const sessionId = Number(event.target.value)
+    const session = sessions.find((item) => item.id === sessionId)
+    if (!session || !selectedProject) return
+
+    const requestId = ++viewRequestIdRef.current
+    sendRequestIdRef.current += 1
+    setSending(false)
+    setActiveSessionId(session.id)
+    setHistoryLoading(true)
+    setMessages([])
+
+    try {
+      const data = await fetchChatSession(selectedProject.id, session.id)
+      if (requestId === viewRequestIdRef.current) {
+        if (data.project_id !== selectedProject.id || data.id !== session.id) {
+          throw new Error('The conversation did not match the selected project.')
+        }
+        setMessages(toChatMessages(data.messages))
+      }
+    } catch {
+      if (requestId === viewRequestIdRef.current) {
+        setToast('Could not load this conversation. Please try again.')
+      }
+    } finally {
+      if (requestId === viewRequestIdRef.current) setHistoryLoading(false)
+    }
+  }
 
   const handleSend = async () => {
     const text = input.trim()
-    if (!text || sending || !selectedProject) return
+    if (!text || sending || historyLoading || !selectedProject || !activeSessionId) return
 
+    const projectId = selectedProject.id
+    const sessionId = activeSessionId
+    const requestId = ++sendRequestIdRef.current
+    const viewRequestId = viewRequestIdRef.current
     setInput('')
     setSending(true)
 
@@ -157,22 +277,34 @@ const AssistantPage = () => {
     setMessages((prev) => [...prev, { role: 'user', text }])
 
     try {
-      const res = await sendMessage(selectedProject.id, text)
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          text: res.answer || 'No answer was returned.',
-          sources: res.sources || [],
-        },
-      ])
-    } catch (err) {
-      setToast('Failed to get a response. Please try again.')
-      setMessages((prev) => prev.slice(0, -1))
-      setInput(text)
+      const res = await sendMessage(projectId, sessionId, text)
+      if (
+        requestId === sendRequestIdRef.current &&
+        viewRequestId === viewRequestIdRef.current
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            text: res.answer || 'No answer was returned.',
+            sources: res.sources || [],
+          },
+        ])
+      }
+    } catch {
+      if (
+        requestId === sendRequestIdRef.current &&
+        viewRequestId === viewRequestIdRef.current
+      ) {
+        setToast('Failed to get a response. Please try again.')
+        setMessages((prev) => prev.slice(0, -1))
+        setInput(text)
+      }
     } finally {
-      setSending(false)
-      inputRef.current?.focus()
+      if (requestId === sendRequestIdRef.current) {
+        setSending(false)
+        inputRef.current?.focus()
+      }
     }
   }
 
@@ -190,8 +322,28 @@ const AssistantPage = () => {
     inputRef.current?.focus()
   }
 
-  const handleNewThread = () => {
-    setMessages([])
+  const handleNewThread = async () => {
+    if (!selectedProject || sending || historyLoading) return
+
+    const projectId = selectedProject.id
+    const requestId = ++viewRequestIdRef.current
+    setHistoryLoading(true)
+    try {
+      const session = await createChatSession(projectId)
+      if (requestId !== viewRequestIdRef.current) return
+      if (session.project_id !== projectId) {
+        throw new Error('The new conversation did not match the selected project.')
+      }
+      setSessions((prev) => [session, ...prev])
+      setActiveSessionId(session.id)
+      setMessages([])
+    } catch {
+      if (requestId === viewRequestIdRef.current) {
+        setToast('Could not start a new conversation. Please try again.')
+      }
+    } finally {
+      if (requestId === viewRequestIdRef.current) setHistoryLoading(false)
+    }
   }
 
   const priorityColor = (p) =>
@@ -242,9 +394,50 @@ const AssistantPage = () => {
             title="Conversation"
             subtitle={`AI-powered support for quality teams${selectedProject ? ` · ${selectedProject.name}` : ''}`}
             action={
-              <Button variant="secondary" onClick={handleNewThread} disabled={sending}>
-                New thread
-              </Button>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <span>Project</span>
+                  <select
+                    value={selectedProject?.id ?? ''}
+                    onChange={handleSelectProject}
+                    disabled={projectLoading || projects.length === 0}
+                    aria-label="Select project"
+                    className="max-w-40 rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+                  >
+                    {projects.length === 0 ? (
+                      <option value="">No projects</option>
+                    ) : (
+                      projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                {sessions.length > 0 && (
+                  <select
+                    value={activeSessionId ?? ''}
+                    onChange={handleSelectSession}
+                    disabled={historyLoading || sending}
+                    aria-label="Select conversation"
+                    className="max-w-40 rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-200 disabled:opacity-50"
+                  >
+                    {sessions.map((session) => (
+                      <option key={session.id} value={session.id}>
+                        {session.title} · {session.id}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={handleNewThread}
+                  disabled={sending || historyLoading || projectLoading || !selectedProject}
+                >
+                  New thread
+                </Button>
+              </div>
             }
             className="flex flex-col"
             style={{ minHeight: 0 }}
@@ -252,6 +445,10 @@ const AssistantPage = () => {
             <div className="testnova-scroll flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" style={{ minHeight: 0 }}>
               {historyLoading ? (
                 <HistorySkeleton />
+              ) : !selectedProject ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <p className="text-sm text-slate-500">Create a project to start a conversation.</p>
+                </div>
               ) : messages.length === 0 ? (
                 <div className="flex flex-1 items-center justify-center">
                   <p className="text-sm text-slate-500">Ask a question to get started.</p>
@@ -282,11 +479,11 @@ const AssistantPage = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={sending || !selectedProject}
+                disabled={sending || historyLoading || !selectedProject || !activeSessionId}
                 className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 disabled:opacity-50"
-                placeholder={selectedProject ? 'Ask the assistant…' : 'Loading projects…'}
+                placeholder={selectedProject ? 'Ask the assistant…' : 'No project available'}
               />
-              <Button onClick={handleSend} disabled={sending || !input.trim() || !selectedProject}>
+              <Button onClick={handleSend} disabled={sending || historyLoading || !input.trim() || !selectedProject || !activeSessionId}>
                 {sending ? 'Sending…' : 'Send'}
               </Button>
             </div>
