@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard
+from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases
 from app.core.exceptions import register_exception_handlers
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
-from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session
+from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,6 +25,7 @@ app.include_router(embeddings.router)
 app.include_router(retrieval.router)
 app.include_router(analytics.router)
 app.include_router(dashboard.router)
+app.include_router(test_cases.router)
 register_exception_handlers(app)
 
 app.add_middleware(
