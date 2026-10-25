@@ -5,9 +5,8 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import CurrentUser
 from app.database.connection import get_db
 from app.schemas.test_case_schema import TestCaseGenerationRequest
-from app.services.test_case_generation_service import (
-    TestCaseGenerationService,
-)
+from app.services.test_case_generation_service import TestCaseGenerationService
+from app.services.test_case_evaluation_service import TestCaseEvaluationService
 
 router = APIRouter(
     prefix="/projects",
@@ -46,3 +45,13 @@ def generate_test_cases(
 
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+@router.post("/{project_id}/test-cases/{test_case_id}/evaluate")
+def evaluate_test_case(project_id:int,test_case_id:int,current_user:CurrentUser,db:Session=Depends(get_db)):
+    service=TestCaseEvaluationService(db)
+
+    try:
+        return service.evaluate(user_id=current_user.id,project_id=project_id,test_case_id=test_case_id)
+
+    except ValueError as exc:
+        raise HTTPException(status_code=404,detail=str(exc))from exc
