@@ -5,7 +5,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
-from app.shemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
+from backend.app.schemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
 
 
 class ProjectService:

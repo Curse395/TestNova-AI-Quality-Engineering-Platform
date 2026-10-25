@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.test_case import TestCase
-from app.shemas.test_execution_schema import APIRequestConfig
+from backend.app.schemas.test_execution_schema import APIRequestConfig
 
 
 class TestExecutionService:
