@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from app.models.document import Document
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
-from backend.app.schemas.document_schema import DocumentUploadRequest, DocumentUploadResponse
+from app.schemas.document_schema import DocumentUploadRequest, DocumentUploadResponse
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
 UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "uploads"
@@ -86,3 +86,4 @@ def list_documents(
         ).model_dump()
         for document in documents
     ], "errors": None}
+

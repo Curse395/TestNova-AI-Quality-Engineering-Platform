@@ -1,2 +1,4 @@
 class SemanticCacheService:
-    def find_similiar_question()
+    """Placeholder for future semantic caching functionality."""
+
+    pass

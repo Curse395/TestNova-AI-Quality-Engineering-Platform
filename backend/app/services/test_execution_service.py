@@ -1,4 +1,4 @@
-
+﻿
 import ipaddress
 import socket
 import time
@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.test_case import TestCase
-from backend.app.schemas.test_execution_schema import APIRequestConfig
+from app.schemas.test_execution_schema import APIRequestConfig
 
 
 class TestExecutionService:
@@ -240,3 +240,4 @@ class TestExecutionService:
             result["duration_ms"] = round((time.perf_counter() - started) * 1000,2)
 
         return result
+

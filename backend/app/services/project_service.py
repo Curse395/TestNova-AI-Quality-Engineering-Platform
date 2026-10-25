@@ -1,11 +1,11 @@
-from sqlalchemy.orm import Session
+﻿from sqlalchemy.orm import Session
 
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
-from backend.app.schemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
 
 
 class ProjectService:
@@ -112,3 +112,4 @@ class ProjectService:
             "chunk_count": total_chunks,
             "updated_at": project.created_at.isoformat() if project.created_at else None,
         }
+

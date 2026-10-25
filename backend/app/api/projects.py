@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import get_db
-from backend.app.schemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas.project_schema import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.services.project_service import ProjectService
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -83,3 +83,4 @@ def project_dashboard(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+

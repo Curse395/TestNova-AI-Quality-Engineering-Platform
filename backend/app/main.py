@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases
+from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases,test_execution
 from app.core.exceptions import register_exception_handlers
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
@@ -26,6 +26,7 @@ app.include_router(retrieval.router)
 app.include_router(analytics.router)
 app.include_router(dashboard.router)
 app.include_router(test_cases.router)
+app.include_router(test_execution.router)
 register_exception_handlers(app)
 
 app.add_middleware(

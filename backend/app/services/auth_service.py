@@ -1,8 +1,8 @@
-from sqlalchemy.orm import Session
+﻿from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-from backend.app.schemas.user_schema import UserCreate, UserLogin, UserResponse
+from app.schemas.user_schema import UserCreate, UserLogin, UserResponse
 
 
 class AuthService:
@@ -59,3 +59,4 @@ class AuthService:
                 email=user.email,
             ),
         }
+
