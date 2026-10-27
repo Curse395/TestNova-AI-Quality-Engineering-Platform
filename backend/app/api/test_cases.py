@@ -21,9 +21,8 @@ def generate_test_cases(
     current_user: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    service = TestCaseGenerationService(db)
-
     try:
+        service = TestCaseGenerationService(db)
         test_cases = service.generate(
             user_id=current_user.id,
             project_id=project_id,

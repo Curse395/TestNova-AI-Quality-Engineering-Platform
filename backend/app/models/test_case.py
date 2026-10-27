@@ -22,7 +22,7 @@ class TestCase(Base):
     review_status=Column(String(20),nullable=False,default="draft")
     created_at=Column(DateTime,default=datetime.utcnow,nullable=False)
     updated_at=Column(DateTime,default=datetime.utcnow,onupdate=datetime.utcnow,nullable=False)
-
+    generation_run_id=Column(Integer,ForeignKey("test_case_generation_runs.id"),nullable=True,index=True)
     project=relationship("Project")
     created_by=relationship("User")
     evidence=relationship("TestCaseEvidence",back_populates="test_case",cascade="all, delete-orphan")

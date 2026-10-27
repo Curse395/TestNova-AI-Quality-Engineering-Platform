@@ -54,13 +54,11 @@ class RetrievalService:
     .all()
 )
 
-        print("\n========RESULTS===============")
-        print(results)
-        print("================================")
-
-
-
-        
+        logger.info(
+            "Project retrieval complete: project_id=%s matched_chunks=%d",
+            project_id,
+            len(results),
+        )
         return [
             {
                 "chunk_id": chunk.id,

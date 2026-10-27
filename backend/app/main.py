@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -5,9 +7,14 @@ from app.api import auth, document_processing, embeddings, knowledge_base, proje
 from app.core.exceptions import register_exception_handlers
 from app.core.responses import ApiResponse, success_response
 from app.database.connection import Base, engine
-from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence
+from app.database.schema import ensure_test_case_generation_schema
+from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence,test_case_generation_run
+from app.models.test_execution import TestExecutionRun
+
+logging.basicConfig(level=logging.INFO)
 
 Base.metadata.create_all(bind=engine)
+ensure_test_case_generation_schema(engine)
 
 app = FastAPI(
     title="TestNova AI",
