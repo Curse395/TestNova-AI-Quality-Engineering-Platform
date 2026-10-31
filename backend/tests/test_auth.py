@@ -22,7 +22,7 @@ def test_register_and_login_flow():
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Jane Doe", "email": "jane@example.com", "password": "securepass123"},
+        json={"name": "Jane Doe", "email": "jane@example.com", "password": "securepass123", "workspace_name": "Jane's Workspace"},
     )
 
     assert register_response.status_code == 200

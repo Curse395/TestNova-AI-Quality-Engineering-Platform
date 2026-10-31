@@ -26,7 +26,7 @@ def test_knowledge_base_index_and_search():
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Knowledge User", "email": "kb@example.com", "password": "securepass123"},
+        json={"name": "Knowledge User", "email": "kb@example.com", "password": "securepass123", "workspace_name": "Knowledge Base Workspace"},
     )
     assert register_response.status_code == 200
 

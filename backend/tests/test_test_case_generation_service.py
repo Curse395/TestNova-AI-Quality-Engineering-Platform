@@ -264,18 +264,30 @@ def test_provider_failure_has_distinct_stage_and_writes_nothing(db):
     _assert_no_generation_rows(db)
 
 
+
 def test_endpoint_returns_bad_gateway_for_generation_failures(monkeypatch):
-    class FailedGenerationService:
+    from app.agents.contracts import AgentResult
+
+    class FailedGenerationAgent:
+        name = "test_generation_agent"
+
         def __init__(self, db):
             self.db = db
 
-        def generate(self, **_):
-            raise GenerationError("json_parse", "The model response was not valid JSON")
+        def run(self, context):
+            return AgentResult(
+                agent_name=self.name,
+                status="failed",
+                error={
+                    "code": "GENERATION_FAILED",
+                    "message": "Test-case generation failed at json_parse.",
+                },
+            )
 
     monkeypatch.setattr(
         test_cases_api,
-        "TestCaseGenerationService",
-        FailedGenerationService,
+        "TestGenerationAgent",
+        FailedGenerationAgent,
     )
 
     with pytest.raises(HTTPException) as exc:

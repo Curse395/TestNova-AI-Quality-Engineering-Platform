@@ -55,11 +55,13 @@ class DashboardService:
                                      if uploaded_documents>0
                                      else 0)
 
-                embedding_coverage=(round((embedding_count/chunk_count)*100, 2)
-                                    if chunk_count>0
-                                    else 0)
+                chunk_embedding_coverage=(round((embedding_count / chunk_count) * 100, 2)
+                                          if chunk_count>0
+                                          else 0)
 
-                project_health=round((processing_coverage*0.5)+(embedding_coverage*0.5), 2)
+                embedding_coverage = round((processing_coverage*0.5)+(chunk_embedding_coverage * 0.5),2)
+
+                project_health=embedding_coverage
 
                 if project_health==100:
                     status="Healthy"

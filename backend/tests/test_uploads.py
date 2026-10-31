@@ -26,7 +26,7 @@ def test_upload_document_flow():
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Uploader", "email": "uploader@example.com", "password": "securepass123"},
+        json={"name": "Uploader", "email": "uploader@example.com", "password": "securepass123", "workspace_name": "Upload Workspace"},
     )
     assert register_response.status_code == 200
 
@@ -64,4 +64,4 @@ def test_upload_document_flow():
 
     listing = client.get("/uploads/project/1", headers=headers)
     assert listing.status_code == 200
-    assert len(listing.json()) == 1
+    assert len(listing.json()["data"]) == 1

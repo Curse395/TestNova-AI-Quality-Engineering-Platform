@@ -1,6 +1,7 @@
 from pydantic import BaseModel,Field,ConfigDict
 from typing import Literal
 
+__test__=False
 TestCategory=Literal["positive","negative","boundary","edge"]
 TestPriority=Literal["low","high","medium","critical"]
 

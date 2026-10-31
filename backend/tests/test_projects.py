@@ -24,7 +24,7 @@ def test_project_crud_and_dashboard_flow():
 
     register_response = client.post(
         "/auth/register",
-        json={"name": "Project Owner", "email": "owner@example.com", "password": "securepass123"},
+        json={"name": "Project Owner", "email": "owner@example.com", "password": "securepass123", "workspace_name": "Project Workspace"},
     )
     assert register_response.status_code == 200
 
@@ -56,7 +56,7 @@ def test_project_crud_and_dashboard_flow():
 
     list_response = client.get("/projects/", headers=headers)
     assert list_response.status_code == 200
-    assert len(list_response.json()) == 1
+    assert len(list_response.json()["data"]) == 1
 
     update_response = client.put(
         f"/projects/{project_id}",
@@ -64,15 +64,15 @@ def test_project_crud_and_dashboard_flow():
         headers=headers,
     )
     assert update_response.status_code == 200
-    assert update_response.json()["name"] == "Alpha Project Updated"
+    assert update_response.json()["data"]["name"] == "Alpha Project Updated"
 
     dashboard_response = client.get(f"/projects/{project_id}/dashboard", headers=headers)
     assert dashboard_response.status_code == 200
-    assert dashboard_response.json()["project_id"] == project_id
+    assert dashboard_response.json()["data"]["project_id"] == project_id
 
     delete_response = client.delete(f"/projects/{project_id}", headers=headers)
     assert delete_response.status_code == 200
 
     after_delete = client.get("/projects/", headers=headers)
     assert after_delete.status_code == 200
-    assert after_delete.json() == []
+    assert after_delete.json()["data"] == []
