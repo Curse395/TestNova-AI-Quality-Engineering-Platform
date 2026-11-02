@@ -1,15 +1,42 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 from app.core.dependencies import CurrentUser
-from app.core.responses import ApiResponse, success_response
+from app.core.responses import ApiResponse
 from app.database.connection import get_db
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.document_embedding import DocumentEmbedding
 from app.models.organization import Organization
 from app.models.project import Project
-from app.models.user import User
+from app.services.retrieval_service import RetrievalService
 
-router = APIRouter(prefix="/projects/{project_id}/knowledge-base", tags=["Knowledge Base"])
+
+router = APIRouter(prefix="/projects/{project_id}/knowledge-base",tags=["Knowledge Base"])
+
+
+def get_owned_project(
+    project_id: int,
+    current_user_id: int,
+    db: Session,
+):
+    project = (
+        db.query(Project)
+        .join(Organization)
+        .filter(
+            Project.id == project_id,
+            Organization.owner_id == current_user_id,
+        )
+        .first()
+    )
+
+    if not project:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found",
+        )
+
+    return project
 
 
 @router.post("/index")
@@ -18,60 +45,99 @@ def index_project_documents(
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
 ) -> ApiResponse:
-    project = (
-        db.query(Project)
-        .join(Organization)
-        .filter(Project.id == project_id, Organization.owner_id == current_user.id)
-        .first()
+
+    project = get_owned_project(
+        project_id,
+        current_user.id,
+        db,
     )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
 
-    documents = db.query(Document).filter(Document.project_id == project.id).all()
-    chunk_count = 0
-    for document in documents:
-        content = read_text_content(document.storage_path)
-        if content:
-            chunk_count += max(1, len(content.split()))
+    document_count = (
+        db.query(Document)
+        .filter(Document.project_id == project.id)
+        .count()
+    )
 
-    return {"success": True, "message": "Knowledge base indexed successfully", "data": {"project_id": project.id, "chunks": chunk_count}, "errors": None, "project_id": project.id, "chunks": chunk_count}
+    chunk_count = (
+        db.query(DocumentChunk)
+        .join(
+            Document,
+            Document.id == DocumentChunk.document_id,
+        )
+        .filter(Document.project_id == project.id)
+        .count()
+    )
+
+    embedding_count = (
+        db.query(DocumentEmbedding)
+        .join(
+            DocumentChunk,
+            DocumentChunk.id == DocumentEmbedding.chunk_id,
+        )
+        .join(
+            Document,
+            Document.id == DocumentChunk.document_id,
+        )
+        .filter(Document.project_id == project.id)
+        .count()
+    )
+
+    return {
+        "success": True,
+        "message": "Knowledge base status retrieved successfully",
+        "data": {
+            "project_id": project.id,
+            "documents": document_count,
+            "chunks": chunk_count,
+            "embeddings": embedding_count,
+            "ready_for_search": (
+                chunk_count > 0 and embedding_count > 0
+            ),
+        },
+        "errors": None,
+    }
 
 
 @router.get("")
 def search_project_documents(
     project_id: int,
     query: str,
+    limit: int = Query(default=4, ge=1, le=20),
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
 ) -> ApiResponse:
-    project = (
-        db.query(Project)
-        .join(Organization)
-        .filter(Project.id == project_id, Organization.owner_id == current_user.id)
-        .first()
+
+    if not query.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Search query cannot be empty",
+        )
+
+    get_owned_project(
+        project_id,
+        current_user.id,
+        db,
     )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
 
-    results: list[dict[str, str]] = []
-    for document in db.query(Document).filter(Document.project_id == project.id).all():
-        content = read_text_content(document.storage_path)
-        if not content:
-            continue
-        if query.lower() in content.lower():
-            results.append(
-                {
-                    "document_name": document.filename,
-                    "excerpt": content[:200],
-                }
-            )
+    retrieval_service = RetrievalService(db)
 
-    return {"success": True, "message": "Knowledge base search completed successfully", "data": results, "errors": None}
-
-
-def read_text_content(storage_path: str) -> str:
     try:
-        with open(storage_path, "r", encoding="utf-8") as handle:
-            return handle.read()
-    except FileNotFoundError:
-        return ""
+        results = retrieval_service.search_project_context(
+            current_user_id=current_user.id,
+            project_id=project_id,
+            query=query.strip(),
+            limit=limit,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
+    return {
+        "success": True,
+        "message": "Knowledge base semantic search completed successfully",
+        "data": results,
+        "errors": None,
+    }

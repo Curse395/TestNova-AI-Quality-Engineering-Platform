@@ -1,13 +1,11 @@
 from __future__ import annotations
-
 import csv
 import json
 import re
+from openpyxl import load_workbook
 from pathlib import Path
 from typing import Any
-
 from sqlalchemy.orm import Session
-
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 
@@ -17,6 +15,28 @@ class DocumentProcessingService:
 
     def __init__(self, db: Session) -> None:
         self.db = db
+
+    def _parse_xlsx(self,path:Path)->str:
+
+        try:
+            workbook=load_workbook(filename=path,read_only=True,data_only=True)
+            extracted_text=[]
+
+            for sheet in workbook.worksheets:
+                extracted_text.append(f"Sheet: {sheet.title}")
+
+            for row in sheet.iter_rows(values_only=True):
+                values=[str(value) for value in row if value is not None]
+
+            if values:
+                extracted_text.append(" | ".join(values))
+
+            workbook.close()
+
+            return"\n".join(extracted_text)
+
+        except Exception as exc:
+            raise RuntimeError(f"Failed to extract text from XLSX '{path.name}'.")from exc
 
     def process_document(self, document: Document) -> dict[str, int | str]:
         """Replace a document's chunks with chunks generated from its current file.
@@ -85,12 +105,14 @@ class DocumentProcessingService:
             return self._parse_pdf(path)
         if suffix == ".docx":
             return self._parse_docx(path)
+        if suffix == ".xlsx":
+            return self._parse_xlsx(path)
 
         return self._parse_text(path)
 
     def normalize_text(self, text: str) -> str:
         text = re.sub(r"\s+", " ", text)
-        text = re.sub(r"\n+", "\n", text)
+        text = text.replace("\x00","")
         return text.strip()
 
     def chunk_text(self, text: str, chunk_size: int = 120, overlap: int = 30) -> list[str]:

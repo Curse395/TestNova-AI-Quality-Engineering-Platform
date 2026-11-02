@@ -31,8 +31,6 @@ class AnalyticsService:
 
     def get_document_statistics(self,current_user_id:int,project_id:int):
         project=(self.db.query(Project).join(Organization).filter(Project.id==project_id,Organization.owner_id==current_user_id).first())
-        print("Current User:", current_user_id)
-        print("Project:", project_id)
         
         if not project:
             raise ValueError("Project not found")
@@ -51,5 +49,5 @@ class AnalyticsService:
                                "chunks":chunk_count,
                                "embeddings":embedding_count,})
 
-            return statistics
+        return statistics
         
