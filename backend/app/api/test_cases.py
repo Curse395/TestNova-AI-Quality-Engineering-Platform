@@ -14,6 +14,8 @@ from app.agents.orchestrator import Orchestrator
 from app.agents.knowledge_agent import KnowledgeAgent
 from app.agents.change_risk_agent import ChangeRiskAgent
 from app.agents.review_agent import ReviewAgent
+from app.agents.test_analysis_agent import TestAnalysisAgent
+from app.agents.quality_insight_agent import QualityInsightAgent
 from app.models.test_case import TestCase
 from app.models.project import Project
 from app.models.organization import Organization
@@ -205,4 +207,69 @@ def review_test_case(
         "agent": result.agent_name,
         "status": result.status,
         "review": result.data
+    }
+
+@router.post("/{project_id}/test-analysis/analyze")
+def analyze_test_executions(
+    project_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    agent = TestAnalysisAgent(db)
+
+    context = AgentContext(
+        user_id=current_user.id,
+        project_id=project_id,
+        task="test_analysis",
+    )
+
+    result = agent.run(context)
+
+    if result.status == "failed":
+        error = result.error or {}
+
+        if error.get("code") == "PROJECT_ACCESS_ERROR":
+            raise HTTPException(status_code=404, detail=error["message"])
+
+        raise HTTPException(status_code=502, detail="Test analysis failed.")
+
+    return {
+        "success": True,
+        "agent": result.agent_name,
+        "status": result.status,
+        "analysis": result.data,
+    }
+
+@router.post("/{project_id}/quality-insights/analyze")
+def analyze_quality_insights(
+    project_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    agent = QualityInsightAgent(db)
+
+    context = AgentContext(
+        user_id=current_user.id,
+        project_id=project_id,
+        task="quality_insights",
+    )
+
+    result = agent.run(context)
+
+    if result.status == "failed":
+        error = result.error or {}
+
+        if error.get("code") == "PROJECT_ACCESS_ERROR":
+            raise HTTPException(status_code=404, detail=error["message"])
+
+        raise HTTPException(
+            status_code=502,
+            detail="Quality insight analysis failed.",
+        )
+
+    return {
+        "success": True,
+        "agent": result.agent_name,
+        "status": result.status,
+        "insights": result.data,
     }
