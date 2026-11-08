@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
 import Navbar from '../components/layout/Navbar'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import { getApiErrorMessage } from '../api/client'
-import { fetchProjectDocuments, fetchProjects, uploadAndProcessDocument } from '../api/projects'
+import { deleteProjectDocument, fetchProjectDocuments, fetchProjects, uploadAndProcessDocument } from '../api/projects'
 
 const UploadPage = () => {
   const [projects, setProjects] = useState([])
@@ -14,8 +15,27 @@ const UploadPage = () => {
   const [file, setFile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [deletingDocumentId, setDeletingDocumentId] = useState(null)
+  const [documentToDelete, setDocumentToDelete] = useState(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState(null)
+  const deletionInProgress = useRef(false)
+  const cancelDeleteButton = useRef(null)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!documentToDelete) return undefined
+
+    cancelDeleteButton.current?.focus()
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && deletingDocumentId === null) {
+        setDocumentToDelete(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [documentToDelete, deletingDocumentId])
 
   useEffect(() => {
     let active = true
@@ -80,6 +100,35 @@ const UploadPage = () => {
     }
   }
 
+  const handleDelete = async () => {
+    if (deletionInProgress.current) return
+    const document = documentToDelete
+    if (!document) return
+
+    deletionInProgress.current = true
+    setDeletingDocumentId(document.id)
+    setError('')
+    setNotice(null)
+    try {
+      const result = await deleteProjectDocument(document.id)
+      setDocuments((current) => current.filter((item) => item.id !== document.id))
+      setDocumentToDelete(null)
+      setNotice({
+        message: result?.file_cleanup_warning || `${document.filename} was deleted.`,
+        warning: Boolean(result?.file_cleanup_warning),
+      })
+    } catch (requestError) {
+      if (requestError?.response?.status === 401) {
+        navigate('/login', { replace: true })
+      } else {
+        setError(getApiErrorMessage(requestError, 'Document could not be deleted.'))
+      }
+    } finally {
+      deletionInProgress.current = false
+      setDeletingDocumentId(null)
+    }
+  }
+
   const statusTone = (status) => status === 'completed'
     ? 'text-emerald-400'
     : status === 'failed'
@@ -91,6 +140,18 @@ const UploadPage = () => {
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="Upload Center" subtitle="Project knowledge" />
         {error && <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
+        {notice && (
+          <p
+            role="status"
+            className={`rounded-2xl border p-4 text-sm ${
+              notice.warning
+                ? 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+            }`}
+          >
+            {notice.message}
+          </p>
+        )}
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <Card title="Upload a document" subtitle="Supported: PDF, DOCX, TXT, CSV, XLSX, and JSON.">
             {loading ? (
@@ -121,6 +182,7 @@ const UploadPage = () => {
                     <option value="bug_report">Bug report / issue</option>
                     <option value="test_log">Test execution log</option>
                     <option value="technical_document">Technical documentation</option>
+                    <option value="api_catalogue">API catalogue</option>
                   </select>
                 </label>
                 <label className="block rounded-3xl border border-dashed border-slate-700 bg-slate-950/70 p-8 text-center">
@@ -153,13 +215,36 @@ const UploadPage = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="break-all font-medium text-white">{document.filename}</p>
-                        <p className="mt-1 text-xs text-slate-500">{document.source_type?.replaceAll('_', ' ')}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {document.source_type?.replaceAll('_', ' ')} · {document.content_type}
+                        </p>
+                        {document.uploaded_at && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Uploaded {new Date(document.uploaded_at).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                       <span className={`shrink-0 text-sm capitalize ${statusTone(document.processing_status)}`}>
                         {document.processing_status}
                       </span>
                     </div>
                     {document.processing_error && <p className="mt-2 text-sm text-rose-300">{document.processing_error}</p>}
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="gap-2 text-rose-300 hover:text-rose-200"
+                        disabled={deletingDocumentId !== null}
+                        aria-label={`Delete ${document.filename}`}
+                        onClick={() => {
+                          setError('')
+                          setDocumentToDelete(document)
+                        }}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                        {deletingDocumentId === document.id ? 'Deleting…' : 'Delete'}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -167,6 +252,55 @@ const UploadPage = () => {
           </Card>
         </div>
       </div>
+      {documentToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && deletingDocumentId === null) {
+              setDocumentToDelete(null)
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-document-title"
+            aria-describedby="delete-document-description"
+            className="w-full max-w-lg rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl shadow-black/50"
+          >
+            <h2 id="delete-document-title" className="text-xl font-semibold text-white">
+              Delete document?
+            </h2>
+            <p className="mt-3 break-all font-medium text-slate-200">
+              {documentToDelete.filename}
+            </p>
+            <p id="delete-document-description" className="mt-3 text-sm leading-6 text-slate-400">
+              This will permanently delete the uploaded file, its extracted chunks, embeddings, and associated evidence links.
+              {' '}Generated test cases and generation history will be preserved.
+            </p>
+            {error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>}
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                ref={cancelDeleteButton}
+                type="button"
+                variant="secondary"
+                disabled={deletingDocumentId !== null}
+                onClick={() => setDocumentToDelete(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-rose-600 text-white shadow-lg shadow-rose-900/30 hover:bg-rose-500"
+                disabled={deletingDocumentId !== null}
+                onClick={handleDelete}
+              >
+                {deletingDocumentId === documentToDelete.id ? 'Deleting…' : 'Delete document'}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

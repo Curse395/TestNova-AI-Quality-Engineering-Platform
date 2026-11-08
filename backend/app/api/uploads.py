@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 
 from enum import Enum
+from sqlalchemy import or_
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,8 +16,11 @@ from app.core.dependencies import CurrentUser
 from app.core.responses import ApiResponse
 from app.database.connection import get_db
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
+from app.models.document_embedding import DocumentEmbedding
 from app.models.organization import Organization
 from app.models.project import Project
+from app.models.test_case_evidence import TestCaseEvidence
 from app.schemas.document_schema import DocumentUploadResponse
 
 router = APIRouter(prefix="/uploads", tags=["Uploads"])
@@ -40,6 +44,7 @@ class DocumentSourceType(str, Enum):
     BUG_REPORT = "bug_report"
     TEST_LOG = "test_log"
     TECHNICAL_DOCUMENT = "technical_document"
+    API_CATALOGUE = "api_catalogue"
 
 
 def _safe_original_filename(filename: str | None) -> str:
@@ -71,6 +76,32 @@ def _validate_upload(filename: str, content_type: str | None) -> str:
             detail="The uploaded content type does not match the file format",
         )
     return normalized_type or "application/octet-stream"
+
+
+def _resolve_document_storage_path(storage_path: str, project_id: int) -> Path:
+    try:
+        upload_root = UPLOAD_ROOT.resolve()
+        resolved_path = Path(storage_path).resolve()
+        relative_path = resolved_path.relative_to(upload_root)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="The document storage path is outside the upload directory",
+        ) from exc
+
+    if (
+        len(relative_path.parts) != 2
+        or relative_path.parts[0] != str(project_id)
+        or Path(storage_path).is_symlink()
+        or (upload_root / str(project_id)).is_symlink()
+        or (resolved_path.exists() and not resolved_path.is_file())
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="The document storage path is not a valid uploaded file",
+        )
+
+    return resolved_path
 
 
 @router.post("/")
@@ -156,6 +187,8 @@ def upload_document(
         filename=document.filename,
         content_type=document.content_type,
         project_id=document.project_id,
+        uploaded_at=document.uploaded_at,
+        uploaded_by_user_id=document.uploaded_by_user_id,
         processing_status=document.processing_status,
         processing_error=document.processing_error,
         source_type=document.source_type,
@@ -185,9 +218,106 @@ def list_documents(
             filename=document.filename,
             content_type=document.content_type,
             project_id=document.project_id,
+            uploaded_at=document.uploaded_at,
+            uploaded_by_user_id=document.uploaded_by_user_id,
             processing_status=document.processing_status,
             processing_error=document.processing_error,
             source_type=document.source_type,
         ).model_dump()
         for document in documents
     ], "errors": None}
+
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = None,
+) -> ApiResponse:
+    try:
+        document = (
+            db.query(Document)
+            .join(Project, Document.project_id == Project.id)
+            .join(Organization, Project.organitzation_id == Organization.id)
+            .filter(
+                Document.id == document_id,
+                Organization.owner_id == current_user.id,
+            )
+            .first()
+        )
+        if not document:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        try:
+            storage_path = _resolve_document_storage_path(
+                document.storage_path,
+                document.project_id,
+            )
+        except HTTPException:
+            db.rollback()
+            raise
+
+        chunk_ids = [
+            chunk_id
+            for (chunk_id,) in db.query(DocumentChunk.id)
+            .filter(DocumentChunk.document_id == document.id)
+            .all()
+        ]
+        filename = document.filename
+
+        db.query(TestCaseEvidence).filter(
+            or_(
+                TestCaseEvidence.document_id == document.id,
+                TestCaseEvidence.chunk_id.in_(chunk_ids),
+            )
+        ).delete(synchronize_session=False)
+        if chunk_ids:
+            db.query(DocumentEmbedding).filter(
+                DocumentEmbedding.chunk_id.in_(chunk_ids)
+            ).delete(synchronize_session=False)
+            db.query(DocumentChunk).filter(
+                DocumentChunk.id.in_(chunk_ids)
+            ).delete(synchronize_session=False)
+        db.delete(document)
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Document deletion failed for document_id=%s", document_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Document could not be deleted",
+        ) from exc
+
+    file_cleanup_warning = None
+    try:
+        storage_path.unlink()
+    except FileNotFoundError:
+        file_cleanup_warning = (
+            "The database record was deleted, but the uploaded file was already missing."
+        )
+    except OSError:
+        logger.exception(
+            "Could not remove uploaded file for document_id=%s",
+            document_id,
+        )
+        file_cleanup_warning = (
+            "The document and related database records were deleted, "
+            "but the uploaded file could not be removed."
+        )
+
+    message = (
+        "Document deleted successfully"
+        if file_cleanup_warning is None
+        else "Document records deleted; file cleanup requires attention"
+    )
+    return {
+        "success": True,
+        "message": message,
+        "data": {
+            "document_id": document_id,
+            "filename": filename,
+            "file_cleanup_warning": file_cleanup_warning,
+        },
+        "errors": None,
+    }

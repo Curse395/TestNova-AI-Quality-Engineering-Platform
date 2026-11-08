@@ -34,6 +34,19 @@ export async function fetchProjectDocuments(projectId) {
   return data.data
 }
 
+export async function fetchProjectTestCases(projectId) {
+  const { data } = await apiClient.get(`/projects/${projectId}/test-cases`)
+  if (!Array.isArray(data?.data)) {
+    throw new Error('Unexpected test cases response.')
+  }
+  return data.data
+}
+
+export async function deleteProjectDocument(documentId) {
+  const { data } = await apiClient.delete(`/uploads/${documentId}`)
+  return data.data
+}
+
 export async function uploadAndProcessDocument(projectId, file, sourceType) {
   const formData = new FormData()
   formData.append('file', file)

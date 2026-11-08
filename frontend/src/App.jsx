@@ -7,6 +7,7 @@ import ProjectsPage from './pages/ProjectsPage'
 import UploadPage from './pages/UploadPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AssistantPage from './pages/AssistantPage'
+import TestCasesPage from './pages/TestCasesPage'
 
 function AppShell({ children }) {
   return (
@@ -46,6 +47,7 @@ function App() {
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/projects" element={<ProjectsPage />} />
                   <Route path="/upload" element={<UploadPage />} />
+                  <Route path="/test-cases" element={<TestCasesPage />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/assistant" element={<AssistantPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />

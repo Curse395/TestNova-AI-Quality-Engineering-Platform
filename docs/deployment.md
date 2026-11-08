@@ -16,6 +16,12 @@ Optional settings:
 - `GEMINI_MODEL` (defaults to the configured code default).
 - `TEMPERATURE`, `MAX_OUTPUT_TOKENS`, `TOP_P`, `TOP_K`.
 - `MAX_UPLOAD_SIZE_BYTES` (defaults to 10 MiB).
+- `RETRIEVAL_TOP_K` (defaults to 4), `RETRIEVAL_MAX_TOP_K` (defaults to 20),
+  and `RETRIEVAL_MIN_SIMILARITY` (defaults to 0.0). Similarity is cosine
+  similarity in the range [-1, 1]; calibrate the threshold on a representative
+  retrieval evaluation set before increasing it.
+- `CONTEXT_TOKEN_BUDGET` (defaults to 1000). Context construction estimates
+  tokens at four characters per token; it does not use a model tokenizer.
 - `CORS_ORIGINS`: JSON array of exact trusted browser origins, for example
   `["https://app.example.com"]`. Do not use wildcard origins with credentials.
 - `AUTO_CREATE_SCHEMA`: defaults to `false`; set to `true` only for local

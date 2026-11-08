@@ -51,7 +51,8 @@ class KnowledgeAgent(BaseAgent):
                 project_id=context.project_id,
                 query=query.strip(),
                 limit=limit,
-                document_ids=document_ids)
+                document_ids=document_ids,
+                source_types=context.inputs.get("source_types"))
 
             return AgentResult(
                 agent_name=self.name,

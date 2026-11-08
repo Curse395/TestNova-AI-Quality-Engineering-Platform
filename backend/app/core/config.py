@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     AUTO_CREATE_SCHEMA: bool = False
     CHUNK_SIZE_WORDS: int = Field(default=120, ge=1)
     CHUNK_OVERLAP_WORDS: int = Field(default=30, ge=0)
+    RETRIEVAL_TOP_K: int = Field(default=4, ge=1)
+    RETRIEVAL_MAX_TOP_K: int = Field(default=20, ge=1)
+    RETRIEVAL_MIN_SIMILARITY: float = Field(default=0.0, ge=-1.0, le=1.0)
+    CONTEXT_TOKEN_BUDGET: int = Field(default=1000, ge=1)
 
     model_config={"env_file":".env","extra":"ignore"}
 

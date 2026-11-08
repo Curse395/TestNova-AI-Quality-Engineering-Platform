@@ -54,13 +54,5 @@ class ChatService:
 
         return{ 
             **response,
-            "sources":[{
-                "document_id": chunks["document_id"],
-                "document_name": chunks["document_name"],
-                "chunk_id":chunks["chunk_id"],
-                "score":chunks["score"],
-                "source_type": chunks.get("source_type", "document"),
-            }
-            for chunks in retrived_chunks
-            ]
+            "sources": context_payload["sources"],
         }

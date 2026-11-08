@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from app.services.model_service import ModelService
@@ -35,21 +36,30 @@ class EmbeddingService:
         if not chunks:
             return 0
 
-        model = ModelService.get_embedding_model()
         try:
             for chunk in chunks:
-                embedding = model.encode(
-                    chunk.content,
-                    normalize_embeddings=True,
-                ).tolist()
-                if len(embedding) != ModelService.EMBEDDING_DIMENSIONS:
-                    raise ValueError("Embedding model returned an unexpected vector dimension")
-
                 existing = (
                     self.db.query(DocumentEmbedding)
                     .filter(DocumentEmbedding.chunk_id == chunk.id)
                     .first()
                 )
+                existing_is_valid = False
+                if existing is not None:
+                    try:
+                        existing_is_valid = (
+                            existing.model_name == ModelService.EMBEDDING_MODEL_NAME
+                            and len(existing.embedding) == ModelService.EMBEDDING_DIMENSIONS
+                            and all(
+                                math.isfinite(float(value))
+                                for value in existing.embedding
+                            )
+                        )
+                    except (OverflowError, TypeError, ValueError):
+                        existing_is_valid = False
+                if existing_is_valid:
+                    continue
+
+                embedding = ModelService.encode_embedding(chunk.content)
                 if existing:
                     existing.embedding = embedding
                     existing.model_name = ModelService.EMBEDDING_MODEL_NAME

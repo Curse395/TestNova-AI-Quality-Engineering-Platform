@@ -15,6 +15,7 @@ class KnowledgeSearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     limit: int = Field(default=4, ge=1, le=20)
     document_ids: list[int] | None = None
+    source_types: list[str] | None = None
 
 
 @router.post("/{project_id}/knowledge/search")
@@ -29,7 +30,8 @@ def search_knowledge(project_id:int,request:KnowledgeSearchRequest,current_user:
         inputs={
             "query": request.query,
             "limit": request.limit,
-            "document_ids": request.document_ids
+            "document_ids": request.document_ids,
+            "source_types": request.source_types,
         }
     )
 

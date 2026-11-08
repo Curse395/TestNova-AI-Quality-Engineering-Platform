@@ -2,10 +2,12 @@ import json
 import logging
 import re
 from pydantic import ValidationError
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.schemas.test_case_schema import GeneratedTestCase, TestCaseGenerationRequest
 from app.services.embedding_service import EmbeddingService
 from app.services.llm_services import LLMService
+from app.services.model_service import ModelService
 from app.services.retrieval_service import RetrievalService
 from app.models.test_case import TestCase
 from app.models.test_case_evidence import TestCaseEvidence
@@ -69,12 +71,17 @@ class TestCaseGenerationService:
         project_id: int,
         request: TestCaseGenerationRequest,
     ) -> list[dict[str, object]]:
+        retrieval_options: dict[str, object] = {
+            "current_user_id": user_id,
+            "project_id": project_id,
+            "query": request.requirements_prompt,
+            "limit": 10,
+            "document_ids": request.document_ids,
+        }
+        if request.source_types is not None:
+            retrieval_options["source_types"] = request.source_types
         chunks = self.retrieval_service.search_project_context(
-            current_user_id=user_id,
-            project_id=project_id,
-            query=request.requirements_prompt,
-            limit=10,
-            document_ids=request.document_ids,
+            **retrieval_options,
         )
 
         missing_query = (
@@ -86,12 +93,19 @@ class TestCaseGenerationService:
             )
             .filter(
                 Document.project_id == project_id,
-                DocumentEmbedding.id.is_(None),
+                or_(
+                    DocumentEmbedding.id.is_(None),
+                    DocumentEmbedding.model_name != ModelService.EMBEDDING_MODEL_NAME,
+                ),
             )
         )
         if request.document_ids is not None:
             missing_query = missing_query.filter(
                 Document.id.in_(request.document_ids)
+            )
+        if request.source_types is not None:
+            missing_query = missing_query.filter(
+                Document.source_type.in_(request.source_types)
             )
         missing_chunk_ids = [row[0] for row in missing_query.all()]
 
@@ -106,11 +120,7 @@ class TestCaseGenerationService:
                 chunk_ids=missing_chunk_ids,
             )
             chunks = self.retrieval_service.search_project_context(
-                current_user_id=user_id,
-                project_id=project_id,
-                query=request.requirements_prompt,
-                limit=10,
-                document_ids=request.document_ids,
+                **retrieval_options,
             )
 
         return chunks
@@ -150,7 +160,8 @@ class TestCaseGenerationService:
             "document_name":chunk["document_name"],
             "source_type":chunk.get("source_type", "document"),
             "source_metadata":chunk.get("source_metadata", {}),
-            "content":chunk["content"]
+            "content":chunk["content"],
+            "similarity":chunk.get("similarity"),
             }
             for chunk in chunks]
 
@@ -451,6 +462,19 @@ Every case must cite at least one supplied evidence chunk ID.
                         {
                             "document_id": link.document_id,
                             "chunk_id": link.chunk_id,
+                            "document_name": evidence_by_chunk_id[link.chunk_id][
+                                "document_name"
+                            ],
+                            "source_type": evidence_by_chunk_id[link.chunk_id][
+                                "source_type"
+                            ],
+                            "source_metadata": evidence_by_chunk_id[link.chunk_id][
+                                "source_metadata"
+                            ],
+                            "excerpt": evidence_by_chunk_id[link.chunk_id]["content"],
+                            "similarity": evidence_by_chunk_id[link.chunk_id][
+                                "similarity"
+                            ],
                         }
                         for link in item.evidence
                     ],

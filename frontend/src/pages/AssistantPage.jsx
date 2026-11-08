@@ -80,20 +80,70 @@ const TypingIndicator = () => (
 /* ------------------------------------------------------------------ */
 /*  Source citation                                                    */
 /* ------------------------------------------------------------------ */
+function formatSourceLocation(metadata = {}) {
+  const sourceMetadata = metadata && typeof metadata === 'object' ? metadata : {}
+  const location = sourceMetadata.source_location && typeof sourceMetadata.source_location === 'object'
+    ? sourceMetadata.source_location
+    : sourceMetadata
+  const parts = []
+
+  if (Array.isArray(location.page_numbers) && location.page_numbers.length) {
+    parts.push(`Page${location.page_numbers.length > 1 ? 's' : ''} ${location.page_numbers.join(', ')}`)
+  }
+  if (location.section) parts.push(`Section: ${location.section}`)
+  if (location.sheet_name) parts.push(`Sheet: ${location.sheet_name}`)
+
+  for (const [startKey, endKey, singular, plural] of [
+    ['line_start', 'line_end', 'Line', 'Lines'],
+    ['row_start', 'row_end', 'Row', 'Rows'],
+  ]) {
+    const start = location[startKey]
+    const end = location[endKey]
+    if (Number.isInteger(start) && Number.isInteger(end)) {
+      parts.push(start === end ? `${singular} ${start}` : `${plural} ${start}–${end}`)
+    } else if (Number.isInteger(start)) {
+      parts.push(`${singular} ${start}`)
+    } else if (Number.isInteger(end)) {
+      parts.push(`${singular} ${end}`)
+    }
+  }
+
+  if (Array.isArray(location.json_paths)) {
+    parts.push(...location.json_paths.filter((path) => typeof path === 'string' && path.length))
+  }
+  return parts.join(' · ')
+}
+
 const SourceCitation = ({ sources }) => {
   if (!sources || sources.length === 0) return null
   return (
     <div className="mt-2 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Sources</p>
       <div className="space-y-2">
-        {sources.map((src, i) => (
-          <div key={i} className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 text-slate-300">
-              📄 {src.document_name}{src.source_type ? ` · ${src.source_type.replaceAll('_', ' ')}` : ''}
-            </span>
-            <span className="text-xs text-slate-500">Similarity: {Number(src.score).toFixed(2)}</span>
-          </div>
-        ))}
+        {sources.map((src) => {
+          const location = formatSourceLocation(src.source_metadata)
+          const similarity = src.similarity
+            ?? (typeof src.distance === 'number' ? 1 - src.distance : null)
+            ?? (typeof src.score === 'number' ? 1 - src.score : null)
+
+          return (
+            <details key={src.chunk_id} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+              <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 text-sm text-slate-300">
+                <span>
+                  📄 {src.document_name}
+                  {src.source_type ? ` · ${src.source_type.replaceAll('_', ' ')}` : ''}
+                  {location ? ` · ${location}` : ''}
+                </span>
+                <span className="text-xs text-slate-500">
+                  Chunk #{src.chunk_id} · Similarity: {Number.isFinite(similarity) ? similarity.toFixed(2) : 'unavailable'}
+                </span>
+              </summary>
+              <p className="mt-2 whitespace-pre-wrap border-l-2 border-sky-500/40 pl-3 text-sm text-slate-400">
+                {src.excerpt || 'Source excerpt is unavailable.'}
+              </p>
+            </details>
+          )
+        })}
       </div>
     </div>
   )

@@ -16,6 +16,9 @@ from app.agents.review_agent import ReviewAgent
 from app.agents.test_analysis_agent import TestAnalysisAgent
 from app.agents.quality_insight_agent import QualityInsightAgent
 from app.models.test_case import TestCase
+from app.models.test_case_evidence import TestCaseEvidence
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.models.project import Project
 from app.models.organization import Organization
 
@@ -36,6 +39,94 @@ class ChangeRiskRequest(BaseModel):
         if not value:
             raise ValueError("Change type cannot be empty")
         return value
+
+
+@router.get("/{project_id}/test-cases")
+def list_project_test_cases(
+    project_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+    limit: int = 100,
+):
+    project = (
+        db.query(Project)
+        .join(Organization)
+        .filter(
+            Project.id == project_id,
+            Organization.owner_id == current_user.id,
+        )
+        .first()
+    )
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not 1 <= limit <= 200:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 200")
+
+    cases = (
+        db.query(TestCase)
+        .filter(TestCase.project_id == project_id)
+        .order_by(TestCase.created_at.desc(), TestCase.id.desc())
+        .limit(limit)
+        .all()
+    )
+    case_ids = [case.id for case in cases]
+    evidence_by_case: dict[int, list[dict[str, object]]] = {
+        case_id: [] for case_id in case_ids
+    }
+
+    if case_ids:
+        evidence_rows = (
+            db.query(TestCaseEvidence, Document, DocumentChunk)
+            .join(TestCase, TestCase.id == TestCaseEvidence.test_case_id)
+            .join(Document, Document.id == TestCaseEvidence.document_id)
+            .join(
+                DocumentChunk,
+                DocumentChunk.id == TestCaseEvidence.chunk_id,
+            )
+            .filter(
+                TestCase.id.in_(case_ids),
+                TestCase.project_id == project_id,
+                Document.project_id == project_id,
+                DocumentChunk.document_id == Document.id,
+            )
+            .order_by(TestCaseEvidence.id.asc())
+            .all()
+        )
+        for link, document, chunk in evidence_rows:
+            evidence_by_case[link.test_case_id].append(
+                {
+                    "document_id": document.id,
+                    "document_name": document.filename,
+                    "source_type": document.source_type or "document",
+                    "chunk_id": chunk.id,
+                    "source_metadata": chunk.source_metadata or {},
+                    "excerpt": chunk.content,
+                }
+            )
+
+    return {
+        "success": True,
+        "message": "Test cases retrieved successfully",
+        "data": [
+            {
+                "id": case.id,
+                "project_id": case.project_id,
+                "title": case.title,
+                "description": case.description,
+                "category": case.category,
+                "priority": case.priority,
+                "preconditions": case.preconditions,
+                "steps": case.steps,
+                "expected_result": case.expected_result,
+                "review_status": case.review_status,
+                "created_at": case.created_at,
+                "generation_run_id": case.generation_run_id,
+                "evidence": evidence_by_case[case.id],
+            }
+            for case in cases
+        ],
+        "errors": None,
+    }
 
 
 
@@ -135,6 +226,7 @@ def analyze_change_risk(
             detail=str(exc)
         ) from exc
 
+ 
     except PermissionError as exc:
         raise HTTPException(
             status_code=403,

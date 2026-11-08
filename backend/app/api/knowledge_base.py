@@ -102,7 +102,8 @@ def index_project_documents(
 def search_project_documents(
     project_id: int,
     query: str,
-    limit: int = Query(default=4, ge=1, le=20),
+    limit: int = Query(default=4, ge=1, le=100),
+    source_types: list[str] | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
 ) -> ApiResponse:
@@ -121,6 +122,7 @@ def search_project_documents(
             project_id=project_id,
             query=query.strip(),
             limit=limit,
+            source_types=source_types,
         )
 
     except ValueError as exc:

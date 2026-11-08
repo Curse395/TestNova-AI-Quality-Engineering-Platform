@@ -90,6 +90,14 @@ def test_document_processing_pipeline():
         assert all(chunk.content for chunk in chunks)
         assert all(chunk.source_metadata["source_type"] == "document" for chunk in chunks)
         assert all(chunk.source_metadata["file_type"] == ".txt" for chunk in chunks)
+        assert all(
+            chunk.source_metadata["extraction"]["parser"] == "utf-8-text"
+            for chunk in chunks
+        )
+        assert all(
+            chunk.source_metadata["filename"] == "sample.txt"
+            for chunk in chunks
+        )
         assert db.query(DocumentEmbedding).count() == 0
     finally:
         db.close()

@@ -63,6 +63,9 @@ def _evidence(chunk_id: int = CHUNK_ID) -> dict:
         "chunk_id": chunk_id,
         "document_id": DOCUMENT_ID,
         "document_name": "login.md",
+        "source_type": "requirements",
+        "source_metadata": {"section": "Authentication"},
+        "similarity": 0.82,
         "content": "Users can sign in with registered credentials.",
     }
 
@@ -147,6 +150,12 @@ def test_valid_model_cases_are_persisted_with_evidence(db):
     assert db.scalar(select(func.count()).select_from(CaseEvidenceModel)) == 1
     assert db.scalar(select(func.count()).select_from(GenerationRunModel)) == 1
     assert db.query(CaseEvidenceModel).one().chunk_id == CHUNK_ID
+    assert cases[0]["evidence"][0]["document_name"] == "login.md"
+    assert cases[0]["evidence"][0]["source_type"] == "requirements"
+    assert cases[0]["evidence"][0]["source_metadata"]["section"] == "Authentication"
+    assert cases[0]["evidence"][0]["excerpt"] == (
+        "Users can sign in with registered credentials."
+    )
 
 
 def test_empty_array_with_missing_login_evidence_logs_likely_gap(db, caplog):

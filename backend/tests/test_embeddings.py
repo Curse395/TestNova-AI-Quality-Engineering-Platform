@@ -72,7 +72,11 @@ def test_embedding_regeneration_flow(monkeypatch):
     assert process_response.status_code == 200, process_response.text
 
     class DummyModel:
+        calls = 0
+
         def encode(self, texts, normalize_embeddings=True):
+            self.calls += 1
+
             class DummyVector(list):
                 def tolist(self):
                     return list(self)
@@ -87,3 +91,11 @@ def test_embedding_regeneration_flow(monkeypatch):
     )
     assert regenerate_response.status_code == 200
     assert regenerate_response.json()["data"]["generated"] >= 1
+
+    repeated_response = client.post(
+        f"/embeddings/regenerate?project_id=1&document_id={document_id}",
+        headers=headers,
+    )
+    assert repeated_response.status_code == 200
+    assert repeated_response.json()["data"]["generated"] == 0
+    assert ModelService._embedding_model.calls == 1

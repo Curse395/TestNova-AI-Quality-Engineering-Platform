@@ -94,7 +94,13 @@ def test_knowledge_base_index_and_search(monkeypatch):
     monkeypatch.setattr(
         RetrievalService,
         "search_project_context",
-        lambda self, current_user_id, project_id, query, limit=4, document_ids=None: [],
+        lambda self,
+        current_user_id,
+        project_id,
+        query,
+        limit=4,
+        document_ids=None,
+        source_types=None: [],
     )
     search_response = client.get("/projects/1/knowledge-base?query=regression", headers=headers)
     assert search_response.status_code == 200

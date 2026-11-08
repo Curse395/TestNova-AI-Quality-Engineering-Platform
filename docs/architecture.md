@@ -121,8 +121,9 @@ document. This is a label, not a source-specific parser or validation schema.
 
 Chunking normalizes whitespace while retaining line boundaries, then groups
 words using `CHUNK_SIZE_WORDS` and `CHUNK_OVERLAP_WORDS`. Chunk metadata
-currently records filename, source type, file type, chunk index, and any
-recognizable page, sheet, or heading context.
+records filename, source type, file type, chunk index, parser/format details,
+and any recognizable page, sheet, or heading context. Unavailable locations
+are omitted rather than inferred.
 
 ## Embeddings, retrieval, and RAG
 
@@ -131,12 +132,19 @@ recognizable page, sheet, or heading context.
 Generation is scoped to a project and can be narrowed to selected documents or
 chunks. Embedding activity snapshots feed the dashboard's processing trend.
 
-`RetrievalService` first checks project ownership and optional document scope,
-encodes the query, and orders the project's embedded chunks by cosine distance.
-The default retrieval count is small and callers can set a bounded limit. There
-is no calibrated relevance cutoff or retrieval benchmark in the current code.
-`ContextBuilderService` assembles retrieved text up to an approximate budget
-using a four-characters-per-token estimate; it does not use a model tokenizer.
+`RetrievalService` first checks project ownership and optional document/source
+type scope, encodes the query with the same configured model used for document
+vectors, and orders the project's matching-model embeddings by cosine distance.
+The response preserves `score` as cosine distance for compatibility and also
+returns explicit `distance` and `similarity` (`1 - distance`) fields.
+`RETRIEVAL_TOP_K`, `RETRIEVAL_MAX_TOP_K`, and `RETRIEVAL_MIN_SIMILARITY`
+control the result count and minimum similarity; the default threshold is
+permissive and is not empirically calibrated. `retrieval_evaluation.py`
+provides repeatable Precision@K, Recall@K, MRR, and source-attribution
+calculations, but a representative labeled benchmark has not yet demonstrated
+quality improvements. `ContextBuilderService` deduplicates chunks, retains
+source identifiers, and assembles context under `CONTEXT_TOKEN_BUDGET` using a
+four-characters-per-token estimate; it does not use a model tokenizer.
 
 Chat combines retrieved context with recent session history and a prompt built
 by `PromptBuilderService`, then calls the configured Gemini model. Responses
@@ -153,7 +161,11 @@ insights.
 
 Test generation retrieves project evidence, asks Gemini for structured cases,
 validates categories and evidence chunk IDs, then saves cases, generation-run
-records, and evidence links. Evaluation checks structure, linked evidence,
+records, and evidence links. The generation response and saved-case listing
+include document/chunk identifiers, source metadata, and the source excerpt
+derived from the persisted chunk; no excerpt is copied into a separate
+historical snapshot. The Upload Center displays document source/format/time,
+and the Test Cases view exposes linked evidence. Evaluation checks structure, linked evidence,
 duplicates, and—when verified evidence is available—uses Gemini for semantic
 assessment. Review is advisory and does not automatically approve a case.
 
