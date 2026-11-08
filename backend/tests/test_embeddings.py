@@ -1,7 +1,5 @@
 import os
-import sys
 from io import BytesIO
-from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +12,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
+from app.services.model_service import ModelService
 
 
 @pytest.fixture(autouse=True)
@@ -70,15 +69,21 @@ def test_embedding_regeneration_flow(monkeypatch):
 
     document_id = upload_response.json()["data"]["id"]
     process_response = client.post(f"/documents/{document_id}/process", headers=headers)
-    assert process_response.status_code == 200
+    assert process_response.status_code == 200, process_response.text
 
     class DummyModel:
         def encode(self, texts, normalize_embeddings=True):
-            return [[0.1, 0.2, 0.3] for _ in texts]
+            class DummyVector(list):
+                def tolist(self):
+                    return list(self)
 
-    dummy_module = SimpleNamespace(SentenceTransformer=lambda *_args, **_kwargs: DummyModel())
-    monkeypatch.setitem(sys.modules, "sentence_transformers", dummy_module)
+            return DummyVector([0.1] * 384)
 
-    regenerate_response = client.post(f"/embeddings/regenerate?document_id={document_id}", headers=headers)
+    monkeypatch.setattr(ModelService, "_embedding_model", DummyModel())
+
+    regenerate_response = client.post(
+        f"/embeddings/regenerate?project_id=1&document_id={document_id}",
+        headers=headers,
+    )
     assert regenerate_response.status_code == 200
     assert regenerate_response.json()["data"]["generated"] >= 1

@@ -11,6 +11,8 @@ from app.main import app
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.user import User
+from app.services.model_service import ModelService
+from app.services.retrieval_service import RetrievalService
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +23,7 @@ def reset_db():
     Base.metadata.drop_all(bind=engine)
 
 
-def test_knowledge_base_index_and_search():
+def test_knowledge_base_index_and_search(monkeypatch):
     client = TestClient(app)
 
     register_response = client.post(
@@ -60,10 +62,40 @@ def test_knowledge_base_index_and_search():
     )
     assert upload_response.status_code == 200
 
+    document_id = upload_response.json()["data"]["id"]
+    process_response = client.post(
+        f"/documents/{document_id}/process",
+        headers=headers,
+    )
+    assert process_response.status_code == 200
+
+    class DummyModel:
+        def encode(self, texts, normalize_embeddings=True):
+            class DummyVector(list):
+                def tolist(self):
+                    return list(self)
+
+            return DummyVector([0.1] * 384)
+
+    monkeypatch.setattr(ModelService, "_embedding_model", DummyModel())
+    embedding_response = client.post(
+        f"/embeddings/regenerate?project_id=1&document_id={document_id}",
+        headers=headers,
+    )
+    assert embedding_response.status_code == 200
+
     index_response = client.post("/projects/1/knowledge-base/index", headers=headers)
     assert index_response.status_code == 200
     assert index_response.json()["data"]["chunks"] >= 1
+    assert index_response.json()["data"]["embeddings"] >= 1
+    assert index_response.json()["data"]["ready_for_search"] is True
 
+    # SQLite does not implement pgvector's cosine-distance operator.
+    monkeypatch.setattr(
+        RetrievalService,
+        "search_project_context",
+        lambda self, current_user_id, project_id, query, limit=4, document_ids=None: [],
+    )
     search_response = client.get("/projects/1/knowledge-base?query=regression", headers=headers)
     assert search_response.status_code == 200
-    assert len(search_response.json()) >= 1
+    assert search_response.json()["data"] == []

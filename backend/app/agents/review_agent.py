@@ -90,7 +90,7 @@ class ReviewAgent(BaseAgent):
                         "No automatic approval or rejection was performed."
                     ),
                 },
-                evidence=[],
+                evidence=evaluation.get("evidence", []),
             )
 
         except ValueError:

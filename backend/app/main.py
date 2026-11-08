@@ -3,16 +3,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases,test_execution,knowledge
 from app.core.exceptions import register_exception_handlers
-from app.core.responses import ApiResponse, success_response
+from app.core.config import settings
 from app.database.connection import Base, engine
-from app.database.schema import ensure_test_case_generation_schema
 from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence,test_case_generation_run
 
 
 logging.basicConfig(level=logging.INFO)
 
-Base.metadata.create_all(bind=engine)
-ensure_test_case_generation_schema(engine)
+if settings.AUTO_CREATE_SCHEMA:
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TestNova AI",description="AI Quality Engineering Platform",version="1.0.0")
 
@@ -33,7 +32,7 @@ register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

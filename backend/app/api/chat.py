@@ -13,13 +13,15 @@ def create_chat_session(
     current_user: CurrentUser,
     db: Session = Depends(get_db),
 ):
-    # TODO: Verify project access using your existing authorization rules.
     service = ChatHistoryService(db)
 
-    session = service.create_session(
-        user_id=current_user.id,
-        project_id=project_id,
-    )
+    try:
+        session = service.create_session(
+            user_id=current_user.id,
+            project_id=project_id,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=404, detail="Project not found") from exc
 
     return {
         "id": session.id,
@@ -131,3 +133,5 @@ def chat(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

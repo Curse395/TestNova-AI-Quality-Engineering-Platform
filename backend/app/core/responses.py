@@ -16,15 +16,6 @@ class ApiResponse(BaseModel):
     errors: list[ErrorDetail] | None = Field(default=None)
 
 
-def success_response(data: Any = None, message: str = "Request completed successfully") -> ApiResponse:
-    
-    return ApiResponse(
-    success=True,
-    message=message,
-    data=data,
-    errors=None,)
-
-
 def error_response(
     message: str,
     errors: list[ErrorDetail] | None = None,

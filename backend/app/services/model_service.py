@@ -1,12 +1,12 @@
 from sentence_transformers import SentenceTransformer
 
 class ModelService:
-    _embedding_model=None
+    EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSIONS = 384
+    _embedding_model = None
 
-    @classmethod 
+    @classmethod
     def get_embedding_model(cls):
         if cls._embedding_model is None:
-            print("Loading SentenceTransformer model...")
-            cls._embedding_model=SentenceTransformer("all-MiniLM-L6-v2")
-            print("Model Loaded successfully.")
+            cls._embedding_model = SentenceTransformer(cls.EMBEDDING_MODEL_NAME)
         return cls._embedding_model

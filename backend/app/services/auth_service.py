@@ -14,22 +14,26 @@ class AuthService:
         if existing_user:
             raise ValueError("This e-mail is already registered")
 
-        user = User(
-            name=data.name,
-            email=data.email,
-            password_hash=hash_password(data.password),
-        )
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+        try:
+            user = User(
+                name=data.name,
+                email=data.email,
+                password_hash=hash_password(data.password),
+            )
+            self.db.add(user)
+            self.db.flush()
 
-        organization=Organization(
-            name=data.workspace_name,
-            owner_id=user.id,
-        )
-        self.db.add(organization)
-        self.db.commit()
-        self.db.refresh(organization)
+            organization = Organization(
+                name=data.workspace_name,
+                owner_id=user.id,
+            )
+            self.db.add(organization)
+            self.db.commit()
+            self.db.refresh(user)
+            self.db.refresh(organization)
+        except Exception:
+            self.db.rollback()
+            raise
 
         return {
             "message": "Account successfully created",
@@ -59,4 +63,3 @@ class AuthService:
                 email=user.email,
             ),
         }
-

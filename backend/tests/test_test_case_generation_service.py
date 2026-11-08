@@ -5,12 +5,11 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 from google.genai import types
-from sqlalchemy import create_engine, func, inspect, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from app.api import test_cases as test_cases_api
 from app.database.connection import Base
-from app.database.schema import ensure_test_case_generation_schema
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.test_case import TestCase as CaseModel
@@ -203,7 +202,8 @@ def test_missing_project_embeddings_are_generated_before_retrieval(monkeypatch):
         def __init__(self, db):
             self.db = db
 
-        def generate_embeddings(self, chunk_ids):
+        def generate_embeddings(self, *, project_id, chunk_ids):
+            assert project_id == PROJECT_ID
             generated_chunk_ids.extend(chunk_ids)
             return len(chunk_ids)
 
@@ -347,29 +347,6 @@ def test_persistence_failure_rolls_back_all_rows(db):
         _generate(service)
 
     _assert_no_generation_rows(db)
-
-
-def test_legacy_database_schema_adds_generation_run_link_idempotently():
-    engine = create_engine("sqlite://")
-    try:
-        with engine.begin() as connection:
-            connection.exec_driver_sql(
-                "CREATE TABLE test_case_generation_runs (id INTEGER PRIMARY KEY)"
-            )
-            connection.exec_driver_sql(
-                "CREATE TABLE test_cases (id INTEGER PRIMARY KEY)"
-            )
-
-        ensure_test_case_generation_schema(engine)
-        ensure_test_case_generation_schema(engine)
-
-        inspector = inspect(engine)
-        columns = {column["name"] for column in inspector.get_columns("test_cases")}
-        indexes = {index["name"] for index in inspector.get_indexes("test_cases")}
-        assert "generation_run_id" in columns
-        assert "ix_test_cases_generation_run_id" in indexes
-    finally:
-        engine.dispose()
 
 
 def _llm_service(response):

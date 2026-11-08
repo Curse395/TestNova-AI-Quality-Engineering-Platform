@@ -4,6 +4,8 @@ from sqlalchemy import desc
 from sqlalchemy.sql import func
 from app.models.chat_history import ChatHistory
 from app.models.chat_session import ChatSession
+from app.models.organization import Organization
+from app.models.project import Project
 
 
 class ChatHistoryService:
@@ -17,6 +19,18 @@ class ChatHistoryService:
         project_id: int,
         title: str = "New Chat",
     ) -> ChatSession:
+        project = (
+            self.db.query(Project)
+            .join(Organization)
+            .filter(
+                Project.id == project_id,
+                Organization.owner_id == user_id,
+            )
+            .first()
+        )
+        if project is None:
+            raise PermissionError("Project not found or access denied.")
+
         session = ChatSession(
             user_id=user_id,
             project_id=project_id,

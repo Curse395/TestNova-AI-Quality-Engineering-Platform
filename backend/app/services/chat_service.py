@@ -41,6 +41,8 @@ class ChatService:
             system_prompt=system_prompt,
             user_prompt=user_prompt,
         )
+        if not response.get("success"):
+            raise RuntimeError("The assistant could not generate a response.")
 
         self.history_service.save_chat(
             user_id=current_user_id,
@@ -56,7 +58,8 @@ class ChatService:
                 "document_id": chunks["document_id"],
                 "document_name": chunks["document_name"],
                 "chunk_id":chunks["chunk_id"],
-                "score":chunks["score"]
+                "score":chunks["score"],
+                "source_type": chunks.get("source_type", "document"),
             }
             for chunks in retrived_chunks
             ]

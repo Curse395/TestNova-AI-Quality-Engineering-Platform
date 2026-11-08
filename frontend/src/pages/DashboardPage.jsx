@@ -99,7 +99,7 @@ const DashboardPage = () => {
   const safeData = data || {
     active_projects: [],
     quality_center: { release_confidence: 0, recommendation: '', knowledge_health: 0, healthy_projects: 0, medium_risk_projects: 0, high_risk_projects: 0 },
-    test_generation: { coverage_uplift: 0, flake_reduction: 0, time_saved_minutes: 0 },
+    test_generation: { coverage_uplift: null, flake_reduction: null, time_saved_minutes: null },
     overview: { total_projects: 0, total_documents: 0, total_chunks: 0, total_embeddings: 0, overall_coverage: 0 },
     live_health: { healthy: 0, needs_review: 0, critical: 0 },
     knowledge_distribution: [],
@@ -142,12 +142,12 @@ const DashboardPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.5fr_0.8fr]">
-          <Card title="Quality command center" subtitle="Your AI-assisted release signal is improving daily." className="overflow-hidden">
+          <Card title="Workspace knowledge health" subtitle="Calculated from project document processing and embedding coverage." className="overflow-hidden">
             <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
               <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-400">Release confidence</p>
+                    <p className="text-sm text-slate-400">Knowledge readiness</p>
                     <p className="mt-2 text-4xl font-semibold text-white">{safeData.quality_center.release_confidence}%</p>
                   </div>
                   <div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-400">
@@ -159,26 +159,25 @@ const DashboardPage = () => {
                   <Button onClick={openInsights} disabled={insightsLoading}>
                     {insightsLoading ? 'Loading…' : 'View insights'}
                   </Button>
-                  <Button variant="secondary">Share report</Button>
                 </div>
               </div>
               <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-sky-500/10 to-slate-950/80 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-slate-400">Autopilot</p>
+                    <p className="text-sm text-slate-400">Measured impact</p>
                     <p className="text-lg font-semibold text-white">Test generation</p>
                   </div>
                   <Sparkles className="text-sky-400" size={18} />
                 </div>
                 <div className="mt-5 space-y-3 text-sm text-slate-300">
                   <div className="flex items-center justify-between rounded-2xl bg-slate-900/80 p-3">
-                    <span>Coverage uplift</span><span className="text-emerald-400">+{safeData.test_generation.coverage_uplift}%</span>
+                    <span>Coverage uplift</span><span className="text-emerald-400">{safeData.test_generation.coverage_uplift == null ? 'Not measured' : `+${safeData.test_generation.coverage_uplift}%`}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-2xl bg-slate-900/80 p-3">
-                    <span>Flake reduction</span><span className="text-sky-400">-{safeData.test_generation.flake_reduction}%</span>
+                    <span>Flake reduction</span><span className="text-sky-400">{safeData.test_generation.flake_reduction == null ? 'Not measured' : `-${safeData.test_generation.flake_reduction}%`}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-2xl bg-slate-900/80 p-3">
-                    <span>Time saved</span><span className="text-violet-400">{safeData.test_generation.time_saved_minutes}m</span>
+                    <span>Time saved</span><span className="text-violet-400">{safeData.test_generation.time_saved_minutes == null ? 'Not measured' : `${safeData.test_generation.time_saved_minutes}m`}</span>
                   </div>
                 </div>
               </div>
@@ -203,46 +202,54 @@ const DashboardPage = () => {
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <Card title="Performance trend" subtitle="Coverage and execution speed over time" className="h-full">
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={safeData.performance_trend}>
-                  <CartesianGrid stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="date" stroke="#64748b" tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} />
-                  <YAxis stroke="#64748b" />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="documents" stroke="#38bdf8" strokeWidth={3} dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="chunks" stroke="#a78bfa" strokeWidth={3} dot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="embeddings" stroke="#34d399" strokeWidth={3} dot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {safeData.performance_trend.length === 0 ? (
+              <p className="flex h-72 items-center justify-center text-sm text-slate-400">No project activity has been recorded yet.</p>
+            ) : (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={safeData.performance_trend}>
+                    <CartesianGrid stroke="#1e293b" vertical={false} />
+                    <XAxis dataKey="date" stroke="#64748b" tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="documents" stroke="#38bdf8" strokeWidth={3} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="chunks" stroke="#a78bfa" strokeWidth={3} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="embeddings" stroke="#34d399" strokeWidth={3} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Card>
 
           <Card title="Knowledge Distribution" subtitle="Embedded knowledge across the workspace">
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={safeData.knowledge_distribution}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={60}
-                    outerRadius={95}
-                    paddingAngle={3}
-                  >
-                    {safeData.knowledge_distribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {safeData.knowledge_distribution.every((entry) => !entry.value) ? (
+              <p className="flex h-72 items-center justify-center text-sm text-slate-400">No document knowledge has been processed yet.</p>
+            ) : (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={safeData.knowledge_distribution}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={95}
+                      paddingAngle={3}
+                    >
+                      {safeData.knowledge_distribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Card>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <Card title="Active projects" subtitle="Release readiness across current workstreams" action={<Button variant="ghost">See all</Button>}>
+          <Card title="Active projects" subtitle="Document processing and embedding coverage" action={<Button variant="ghost" onClick={() => navigate('/projects')}>See all</Button>}>
             <div className="space-y-3">
               {safeData.active_projects.length === 0 ? (
                 <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-6 text-center text-sm text-slate-400">
@@ -265,7 +272,7 @@ const DashboardPage = () => {
             </div>
           </Card>
 
-          <Card title="AI assistant snapshot" subtitle="Suggested actions" action={<Button variant="ghost">Open chat</Button>}>
+          <Card title="AI assistant snapshot" subtitle="Suggested actions" action={<Button variant="ghost" onClick={() => navigate('/assistant')}>Open chat</Button>}>
             <div className="space-y-3">
               {safeData.assistant.suggestions.length === 0 ? (
                 <p className="rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-6 text-center text-sm text-slate-400">
@@ -321,7 +328,7 @@ const OverviewIcon = ({ name }) => {
 
 const InsightsModal = ({ open, onClose, loading, error, insights, onRetry }) => {
   return (
-    <Modal open={open} onClose={onClose} title="Release Insights" subtitle="AI-powered analysis of your workspace readiness">
+    <Modal open={open} onClose={onClose} title="Knowledge Insights" subtitle="Workspace document processing and embedding readiness">
       {loading ? (
         <div className="space-y-4">
           <div className="h-24 animate-pulse rounded-2xl bg-slate-800/70" />
@@ -335,9 +342,9 @@ const InsightsModal = ({ open, onClose, loading, error, insights, onRetry }) => 
         </div>
       ) : insights ? (
         <div className="space-y-5">
-          {/* Release Confidence */}
+          {/* Knowledge readiness */}
           <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <p className="text-xs text-slate-400">Release Confidence</p>
+            <p className="text-xs text-slate-400">Knowledge readiness</p>
             <p className="mt-1 text-3xl font-semibold text-white">{insights.release_confidence}%</p>
           </div>
 
@@ -377,11 +384,11 @@ const InsightsModal = ({ open, onClose, loading, error, insights, onRetry }) => 
             </div>
           )}
 
-          {/* Estimated confidence after fix */}
+          {/* Estimated readiness after fix */}
           <div className="flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
             <div className="flex items-center gap-3">
               <TrendingUp className="text-emerald-400" size={20} />
-              <span className="text-sm text-emerald-200">Estimated confidence after fix</span>
+              <span className="text-sm text-emerald-200">Estimated readiness after fixes</span>
             </div>
             <span className="text-2xl font-semibold text-emerald-300">{insights.estimated_confidence_after_fix}%</span>
           </div>

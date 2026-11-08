@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func
 import math
 from app.models.organization import Organization
 from app.models.project import Project
@@ -113,19 +113,15 @@ class DashboardService:
         release_confidence = math.floor(release_confidence_raw + 0.5)
 
         if release_confidence >= 90:
-            recomendation=("Knowledge base is healthy and ready.")
+            recomendation=("Knowledge base is complete and ready for retrieval.")
         elif release_confidence >= 70:
-            recomendation=("Improve documentation coverage before release.")
+            recomendation=("Improve document processing and embedding coverage.")
         else:
-            recomendation=("High release risk detected. Additional processing is recommended.")
+            recomendation=("Knowledge coverage is incomplete. Additional processing is recommended.")
 
         high_risk_projects=critical
         medium_risk_projects=needs_review
         healthy_projects=healthy
-
-        coverage_uplift=min(overall_coverage // 8,15)
-        flake_reduction=min(healthy * 12,25)
-        time_saved=(total_chunks*5)
 
         assistant_suggestion=[]
         if total_documents == 0:
@@ -173,9 +169,9 @@ class DashboardService:
                         "recomendation":recomendation
                     },
                     "test_generation":{
-                        "coverage_uplift":coverage_uplift,
-                        "flake_reduction":flake_reduction,
-                        "time_saved_minutes":time_saved,
+                        "coverage_uplift":None,
+                        "flake_reduction":None,
+                        "time_saved_minutes":None,
                     },
                     "overview":{
                         "total_projects":total_projects,
@@ -215,18 +211,18 @@ class DashboardService:
 
         if release_confidence>=90:
             summary=(
-                f"Your workspace is release-ready with {knowledge_health}% knowledge health"
+                f"Your knowledge base has {knowledge_health}% processing health "
                 f"and {overall_coverage}% embedding coverage."
             )
         elif release_confidence >= 70:
             summary=(
-                f"Your workspace is mostly healthy, but improvements are recommended before release. "
-                f"Current knowledge health is {knowledge_health}%."
+                f"Your knowledge base is mostly complete, but improvements are recommended. "
+                f"Current processing health is {knowledge_health}%."
             )
         else:
             summary=(
-                f"Release confidence is low because parts of your knowledge base are incomplete. "
-                f"Knowledge health is {knowledge_health}% and overall embedding coverage is {overall_coverage}%."
+                f"Knowledge readiness is low because parts of the knowledge base are incomplete. "
+                f"Processing health is {knowledge_health}% and embedding coverage is {overall_coverage}%."
             )
 
         issues=[]
@@ -261,13 +257,13 @@ class DashboardService:
             recommendations.append("Generate embedding for all processed document chunks.")
 
         if dashboard["live_health"]["needs_review"]>0:
-            recommendations.append("Review project marked as 'Needs Review' before release.")
+            recommendations.append("Review projects marked as 'Needs Review'.")
 
         if dashboard["live_health"]["critical"]>0:
-            recommendations.append("Resolve all critical projects immediately")
+            recommendations.append("Resolve projects with critical knowledge coverage.")
 
         if dashboard["quality_center"]["release_confidence"]>=90:
-            recommendations.append("Workspace is ready for release.")
+            recommendations.append("Workspace knowledge coverage is complete.")
 
         estimated_confidence=release_confidence
 

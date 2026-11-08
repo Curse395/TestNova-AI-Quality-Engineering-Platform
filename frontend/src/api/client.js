@@ -9,6 +9,11 @@ export const apiClient = axios.create({
   },
 })
 
+export function getApiErrorMessage(error, fallback) {
+  const response = error?.response?.data
+  return response?.detail || response?.message || response?.errors?.[0]?.detail || fallback
+}
+
 // Attach the JWT token to every request if present.
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
@@ -21,5 +26,11 @@ apiClient.interceptors.request.use((config) => {
 // Normalize any 401 responses into a clear error for callers.
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error),
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem('access_token')
+      window.dispatchEvent(new Event('testnova:unauthorized'))
+    }
+    return Promise.reject(error)
+  },
 )

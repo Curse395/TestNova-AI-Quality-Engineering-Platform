@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
-from app.core.responses import ApiResponse, success_response
+from app.core.responses import ApiResponse
 from app.database.connection import get_db
 from app.services.context_builder_service import ContextBuilderService
 from app.services.retrieval_service import RetrievalService

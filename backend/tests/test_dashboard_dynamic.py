@@ -119,7 +119,7 @@ def test_release_confidence_is_dynamic_across_scenarios():
     base = fetch()
     base_rc = base["quality_center"]["release_confidence"]
     assert base_rc == 100, f"Expected baseline RC 100, got {base_rc}"
-    assert base["quality_center"]["recomendation"] == "Knowledge base is healthy and ready."
+    assert base["quality_center"]["recomendation"] == "Knowledge base is complete and ready for retrieval."
     assert base["overview"]["total_projects"] == 1
     assert base["overview"]["overall_coverage"] == 100
     assert base["live_health"]["healthy"] == 1
@@ -141,7 +141,7 @@ def test_release_confidence_is_dynamic_across_scenarios():
     assert rc_a < base_rc, "RC should decrease after adding an unprovisioned project"
     # 100*0.4 + 50*0.3 + 100*0.3 = 85
     assert rc_a == 85, f"Scenario A expected RC 85, got {rc_a}"
-    assert scn_a["quality_center"]["recomendation"] == "Improve documentation coverage before release."
+    assert scn_a["quality_center"]["recomendation"] == "Improve document processing and embedding coverage."
     # Healthy project % is now 50.
     healthy_pct_a = (scn_a["live_health"]["healthy"] / scn_a["overview"]["total_projects"]) * 100
     assert healthy_pct_a == 50
@@ -176,7 +176,7 @@ def test_release_confidence_is_dynamic_across_scenarios():
     # knowledge_health = 50 + 66.67*0.5 = 83.33
     # RC = 83.33*0.4 + 50*0.3 + 66.67*0.3 = 68.33 -> 68
     assert rc_b == 68, f"Scenario B expected RC 68, got {rc_b}"
-    assert scn_b["quality_center"]["recomendation"] == "High release risk detected. Additional processing is recommended."
+    assert scn_b["quality_center"]["recomendation"] == "Knowledge coverage is incomplete. Additional processing is recommended."
 
     # ---- Scenario C: generate embeddings for the unembedded chunk ----
     db = SessionLocal()
@@ -209,7 +209,7 @@ def test_release_confidence_is_dynamic_across_scenarios():
     assert scn_c["overview"]["total_projects"] == 2
     assert scn_c["live_health"]["healthy"] == 2, "embedded project should now be healthy"
     assert rc_c == 100, f"Scenario C expected RC 100, got {rc_c}"
-    assert scn_c["quality_center"]["recomendation"] == "Knowledge base is healthy and ready."
+    assert scn_c["quality_center"]["recomendation"] == "Knowledge base is complete and ready for retrieval."
 
 
 def test_recommendation_thresholds_are_correct():
@@ -315,4 +315,3 @@ def test_unprocessed_documents_reduce_project_health():
     # Neither Healthy nor Needs Review for this single project.
     assert payload["live_health"]["healthy"] == 0
     assert payload["live_health"]["needs_review"] == 0
-

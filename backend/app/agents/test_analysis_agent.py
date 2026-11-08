@@ -3,6 +3,7 @@ from collections import Counter
 
 from app.agents.base import BaseAgent
 from app.agents.contracts import AgentContext, AgentResult
+from app.agents.execution_metrics import summarize_execution_statuses
 from app.services.test_execution_service import TestExecutionService
 from app.services.llm_services import LLMService
 
@@ -39,10 +40,7 @@ class TestAnalysisAgent(BaseAgent):
                     },
                 )
 
-            status_counts = Counter(
-                item.get("status", "unknown")
-                for item in executions
-            )
+            status_counts = summarize_execution_statuses(executions)
 
             failed_executions = [
                 item for item in executions

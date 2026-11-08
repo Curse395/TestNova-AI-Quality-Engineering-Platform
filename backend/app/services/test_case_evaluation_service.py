@@ -84,8 +84,7 @@ class TestCaseEvaluationService:
             add_finding(
                 "high",
                 "evidence_integrity",
-                f"Some linked evidence could not be verified within this project." 
-                f"1Invalid chunk IDs: {invalid_evidence_ids}"
+                "Some linked evidence could not be verified within this project."
             )
         else:
             add_finding(
@@ -360,6 +359,14 @@ Rules:
                 "exact_duplicate_case_ids": exact_duplicates,
                 "semantic_evaluation": semantic_evaluation
             },
+            "evidence": [
+                {
+                    "document_id": item["document_id"],
+                    "chunk_id": item["chunk_id"],
+                    "document_name": item["document_name"],
+                }
+                for item in evidence
+            ],
             "findings": findings,
             "semantic_error": semantic_error,
             "note": ("This report is advisory. It does not execute the test case and does not automatically approve it.")

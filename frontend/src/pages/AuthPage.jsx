@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import FormField from '../components/ui/FormField'
-import { apiClient } from '../api/client'
+import { apiClient, getApiErrorMessage } from '../api/client'
 
 const AuthPage = () => {
   const [mode, setMode] = useState('login')
@@ -26,14 +26,22 @@ const AuthPage = () => {
           ? { email: form.email, password: form.password }
           : { name: form.name, email: form.email, password: form.password, workspace_name: form.workspace_name }
 
-      const res = await apiClient.post(endpoint, payload)
+      let res = await apiClient.post(endpoint, payload)
+      if (mode === 'register') {
+        res = await apiClient.post('/auth/login', {
+          email: form.email,
+          password: form.password,
+        })
+      }
       const token = res.data.access_token || res.data?.data?.access_token
       if (token) {
         localStorage.setItem('access_token', token)
+      } else {
+        throw new Error('Authentication response did not contain an access token.')
       }
       navigate('/')
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Something went wrong. Please try again.')
+      setError(getApiErrorMessage(err, 'Something went wrong. Please try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -92,9 +100,13 @@ const AuthPage = () => {
 
             <p className="mt-6 text-center text-sm text-slate-500">
               {mode === 'login' ? 'Need a workspace?' : 'Already have an account?'}{' '}
-              <Link to="/" className="text-sky-400">
-                {mode === 'login' ? 'Request access' : 'Sign in'}
-              </Link>
+              <button
+                type="button"
+                className="text-sky-400"
+                onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
+              >
+                {mode === 'login' ? 'Create an account' : 'Sign in'}
+              </button>
             </p>
           </div>
         </div>

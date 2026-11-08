@@ -34,11 +34,11 @@ export async function fetchDashboard() {
     },
     test_generation: {
       coverage_uplift:
-        payload.test_generation?.coverage_uplift ?? 0,
+        payload.test_generation?.coverage_uplift ?? null,
       flake_reduction:
-        payload.test_generation?.flake_reduction ?? 0,
+        payload.test_generation?.flake_reduction ?? null,
       time_saved_minutes:
-        payload.test_generation?.time_saved_minutes ?? 0,
+        payload.test_generation?.time_saved_minutes ?? null,
     },
     overview: {
       total_projects: payload.overview?.total_projects ?? 0,

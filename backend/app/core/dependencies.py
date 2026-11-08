@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from app.core.security import ALGORITHM, SECRET_KEY
+from app.core.config import settings
+from app.core.security import ALGORITHM
 from app.database.connection import get_db
 from app.models.user import User
 
@@ -17,7 +18,7 @@ def get_current_user(
     token=credentials.credentials
     
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 

@@ -4,14 +4,17 @@ import socket
 import time
 import httpx
 import os 
+import logging
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.test_case import TestCase
 from app.models.test_execution import TestExecutionRun
 from app.schemas.test_execution_schema import APIRequestConfig
+
+logger = logging.getLogger(__name__)
 
 
 class TestExecutionService:
@@ -36,7 +39,7 @@ class TestExecutionService:
                 error=result["error"],
                 request_snapshot=self._build_request_snapshot(config),
                 expected_status_code=config.expected_status_code,
-                expected_json_fields=config.expected_json_fields
+                expected_json_fields=self._redact_sensitive_data(config.expected_json_fields)
             )
 
             self.db.add(run)
@@ -48,7 +51,12 @@ class TestExecutionService:
 
         except Exception as exc:
             self.db.rollback()
-            print(f"[Execution history save error: {exc!r}]")
+            logger.error(
+                "Could not save API execution history: project_id=%s test_case_id=%s error_type=%s",
+                project_id,
+                test_case_id,
+                type(exc).__name__,
+            )
             result["history_saved"]=False
             result["history_error"]=("Execution completed, but its history could not be saved")
 
@@ -78,8 +86,6 @@ class TestExecutionService:
     @staticmethod
     def _validate_target(url: str) -> None:
         """Validate HTTPS targets against an explicit host allowlist."""
-        from urllib.parse import urlsplit
-
         parsed = urlsplit(url)
 
         if parsed.scheme.lower() != "https":
@@ -143,7 +149,65 @@ class TestExecutionService:
                 raise ValueError("API target resolves to a private or reserved address.")
             
     @staticmethod
+    def _is_sensitive_key(key: str) -> bool:
+        normalized = "".join(character for character in key.lower() if character.isalnum())
+        return normalized in {
+            "auth",
+            "authorization",
+            "proxyauthorization",
+            "authheader",
+            "bearer",
+        } or normalized.endswith("auth") or any(
+            marker in normalized
+            for marker in (
+                "apikey",
+                "cookie",
+                "credential",
+                "password",
+                "passwd",
+                "secret",
+                "token",
+                "privatekey",
+                "jwt",
+            )
+        ) or normalized in {"key", "sig", "signature"}
+
+    @classmethod
+    def _redact_sensitive_data(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: (
+                    "[REDACTED]"
+                    if cls._is_sensitive_key(str(key))
+                    else cls._redact_sensitive_data(item)
+                )
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._redact_sensitive_data(item) for item in value]
+        return value
+
+    @classmethod
+    def _redact_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        query = [
+            (key, "[REDACTED]" if cls._is_sensitive_key(key) else item)
+            for key, item in parse_qsl(parsed.query, keep_blank_values=True)
+        ]
+        return urlunsplit(parsed._replace(query=urlencode(query)))
+
+    @classmethod
+    def _redact_request_snapshot(cls, snapshot: dict[str, Any] | None) -> dict[str, Any] | None:
+        if snapshot is None:
+            return None
+        redacted = cls._redact_sensitive_data(snapshot)
+        if isinstance(redacted.get("url"), str):
+            redacted["url"] = cls._redact_url(redacted["url"])
+        return redacted
+
+    @classmethod
     def _check_json_fields(
+        cls,
         response_data: Any,
         expected_fields: dict[str, Any],
     ) -> list[dict[str, Any]]:
@@ -160,38 +224,37 @@ class TestExecutionService:
                     break
 
             if current != expected_value:
+                sensitive_value = cls._is_sensitive_key(field_path)
                 failures.append(
                     {
                         "check": f"json_field:{field_path}",
-                        "expected": expected_value,
-                        "actual": (None if type(current) is object else current)
+                        "expected": (
+                            "[REDACTED]"
+                            if sensitive_value
+                            else cls._redact_sensitive_data(expected_value)
+                        ),
+                        "actual": (
+                            None
+                            if type(current) is object
+                            else "[REDACTED]"
+                            if sensitive_value
+                            else cls._redact_sensitive_data(current)
+                        ),
                     }
                 )
 
         return failures
 
     
-    @staticmethod
-    def _build_request_snapshot(config: APIRequestConfig) -> dict[str, Any]:
-        """Capture request configuration without storing sensitive headers."""
-
-        sensitive_headers = {
-            "authorization",
-            "proxy-authorization",
-            "cookie",
-            "set-cookie",
-            "x-api-key",
-            "api-key"
-        }
-
-        safe_headers = {key: value for key, value in config.headers.items() if key.lower() not in sensitive_headers}
-
+    @classmethod
+    def _build_request_snapshot(cls, config: APIRequestConfig) -> dict[str, Any]:
+        """Capture request configuration without retaining common credentials."""
         return {
             "method": config.method,
-            "url": str(config.url),
-            "headers": safe_headers,
-            "params": config.params,
-            "json_body": config.json_body,
+            "url": cls._redact_url(str(config.url)),
+            "headers": cls._redact_sensitive_data(config.headers),
+            "params": cls._redact_sensitive_data(config.params),
+            "json_body": cls._redact_sensitive_data(config.json_body),
             "timeout_seconds": config.timeout_seconds
         }
 
@@ -204,7 +267,6 @@ class TestExecutionService:
         config: APIRequestConfig,
     ) -> dict[str, Any]:
 
-        print("EXECUTE_API_TEST CALLED", project_id, test_case_id)
         test_case = self._verify_project_access(
             user_id=user_id,
             project_id=project_id,
@@ -338,7 +400,7 @@ class TestExecutionService:
                     "status": run.status,
                     "http_status_code": run.http_status_code,
                     "duration_ms": run.duration_ms,
-                    "assertions": run.assertions,
+                    "assertions": self._redact_sensitive_data(run.assertions),
                     "error": run.error,
                     "created_at": run.created_at,
                 }for run in runs
@@ -389,12 +451,12 @@ class TestExecutionService:
                 "status": run.status,
                 "http_status_code": run.http_status_code,
                 "duration_ms": run.duration_ms,
-                "assertions": run.assertions,
+                "assertions": self._redact_sensitive_data(run.assertions),
                 "error": run.error,
                 "created_at": run.created_at,
-                "request_snapshot": run.request_snapshot,
+                "request_snapshot": self._redact_request_snapshot(run.request_snapshot),
                 "expected_status_code": run.expected_status_code,
-                "expected_json_fields": run.expected_json_fields
+                "expected_json_fields": self._redact_sensitive_data(run.expected_json_fields)
             },
             "test_case": {
                 "id": test_case.id,
@@ -409,6 +471,3 @@ class TestExecutionService:
             },
             "evidence": evidence
         }
-
-
-

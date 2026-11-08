@@ -40,7 +40,7 @@ class TestGenerationAgent(BaseAgent):
                 agent_name=self.name,
                 status="failed",
                 error={
-                    "code":"PERMISSION DENIED",
+                    "code":"PERMISSION_DENIED",
                     "message":"You do not have permission to generate tests for this project"
                 }
             )

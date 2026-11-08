@@ -1,9 +1,4 @@
 from datetime import datetime
-from sqlalchemy import Column,Integer,DateTime,ForeignKey,Index,JSON,String,Text
-from app.database.connection import Base
-
-
-from datetime import datetime
 
 from sqlalchemy import (
     Column,

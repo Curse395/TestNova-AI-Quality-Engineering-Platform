@@ -113,12 +113,6 @@ def search_project_documents(
             detail="Search query cannot be empty",
         )
 
-    get_owned_project(
-        project_id,
-        current_user.id,
-        db,
-    )
-
     retrieval_service = RetrievalService(db)
 
     try:
@@ -130,10 +124,15 @@ def search_project_documents(
         )
 
     except ValueError as exc:
+        if "project not found" in str(exc).lower():
+            raise HTTPException(
+                status_code=404,
+                detail="Project not found",
+            ) from exc
         raise HTTPException(
             status_code=400,
             detail=str(exc),
-        )
+        ) from exc
 
     return {
         "success": True,

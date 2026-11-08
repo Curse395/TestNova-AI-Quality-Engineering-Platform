@@ -110,6 +110,8 @@ class RetrievalService:
                 "chunk_id": chunk.id,
                 "document_id": chunk.document_id,
                 "document_name": document.filename,
+                "source_type": document.source_type,
+                "source_metadata": chunk.source_metadata,
                 "content": chunk.content,
                 "score": float(score),
                 "has_embedding": True,

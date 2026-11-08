@@ -5,6 +5,7 @@ import re
 from openpyxl import load_workbook
 from pathlib import Path
 from typing import Any
+from app.core.config import settings
 from sqlalchemy.orm import Session
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
@@ -17,26 +18,25 @@ class DocumentProcessingService:
         self.db = db
 
     def _parse_xlsx(self,path:Path)->str:
-
+        workbook = None
         try:
             workbook=load_workbook(filename=path,read_only=True,data_only=True)
             extracted_text=[]
 
             for sheet in workbook.worksheets:
                 extracted_text.append(f"Sheet: {sheet.title}")
-
-            for row in sheet.iter_rows(values_only=True):
-                values=[str(value) for value in row if value is not None]
-
-            if values:
-                extracted_text.append(" | ".join(values))
-
-            workbook.close()
+                for row in sheet.iter_rows(values_only=True):
+                    values = [str(value) for value in row if value is not None]
+                    if values:
+                        extracted_text.append(" | ".join(values))
 
             return"\n".join(extracted_text)
 
         except Exception as exc:
             raise RuntimeError(f"Failed to extract text from XLSX '{path.name}'.")from exc
+        finally:
+            if workbook is not None:
+                workbook.close()
 
     def process_document(self, document: Document) -> dict[str, int | str]:
         """Replace a document's chunks with chunks generated from its current file.
@@ -47,15 +47,12 @@ class DocumentProcessingService:
         """
         raw_text = self.parse_document(document.storage_path)
 
-        print("=" * 50)
-        print("DOCUMENT:", document.filename)
-        print("PATH",document.storage_path)
-        print("TEXT LENGTH:", len(raw_text))
-        print(raw_text[:200])
-        print("="*50)
+        if not raw_text.strip():
+            raise ValueError("The document contains no extractable text.")
 
         chunks = self.chunk_text(raw_text)
-        print("TOTAL CHUNKS:", len(chunks))
+        if not chunks:
+            raise ValueError("The document contains no extractable text.")
 
         try:
             existing_chunks = (
@@ -66,22 +63,44 @@ class DocumentProcessingService:
             for chunk in existing_chunks:
                 self.db.delete(chunk)
 
+            current_page: int | None = None
+            current_sheet: str | None = None
+            current_section: str | None = None
             for index, content in enumerate(chunks):
-                print(f"Saving chunk {index}")
+                page_numbers = [
+                    int(match)
+                    for match in re.findall(r"^Page (\d+):", content, re.MULTILINE)
+                ]
+                sheet_names = re.findall(r"^Sheet: (.+)$", content, re.MULTILINE)
+                headings = re.findall(r"^#{1,6}\s+(.+)$", content, re.MULTILINE)
+                if page_numbers:
+                    current_page = page_numbers[-1]
+                if sheet_names:
+                    current_sheet = sheet_names[-1]
+                if headings:
+                    current_section = headings[-1]
+
                 self.db.add(
                     DocumentChunk(
                         document_id=document.id,
                         chunk_index=index,
                         content=content,
+                        source_metadata={
+                            "filename": document.filename,
+                            "source_type": document.source_type,
+                            "file_type": Path(document.filename).suffix.lower(),
+                            "chunk_index": index,
+                            "page_numbers": page_numbers or (
+                                [current_page] if current_page is not None else []
+                            ),
+                            "sheet_name": current_sheet,
+                            "section": current_section,
+                        },
                     )
                 )
-            print("COMMITTING...")
-
             self.db.commit()
-            print("COMMIT SUCCESS")
 
-        except Exception as e:
-            print("DATABASE ERROR:", e)
+        except Exception:
             self.db.rollback()
             raise
 
@@ -108,30 +127,74 @@ class DocumentProcessingService:
         if suffix == ".xlsx":
             return self._parse_xlsx(path)
 
-        return self._parse_text(path)
+        raise ValueError(f"Unsupported document format: '{suffix or 'no extension'}'.")
 
     def normalize_text(self, text: str) -> str:
-        text = re.sub(r"\s+", " ", text)
-        text = text.replace("\x00","")
-        return text.strip()
+        text = text.replace("\x00", "")
+        lines = [
+            re.sub(r"[^\S\r\n]+", " ", line).strip()
+            for line in text.splitlines()
+        ]
+        return "\n".join(lines).strip()
 
-    def chunk_text(self, text: str, chunk_size: int = 120, overlap: int = 30) -> list[str]:
+    def chunk_text(
+        self,
+        text: str,
+        chunk_size: int | None = None,
+        overlap: int | None = None,
+    ) -> list[str]:
+        chunk_size = settings.CHUNK_SIZE_WORDS if chunk_size is None else chunk_size
+        overlap = settings.CHUNK_OVERLAP_WORDS if overlap is None else overlap
+        if chunk_size < 1:
+            raise ValueError("Chunk size must be at least one word.")
+        if overlap < 0 or overlap >= chunk_size:
+            raise ValueError("Chunk overlap must be non-negative and smaller than chunk size.")
+
         normalized = self.normalize_text(text)
         if not normalized:
             return []
 
-        words = normalized.split()
         chunks: list[str] = []
-        start = 0
-        while start < len(words):
-            end = min(start + chunk_size, len(words))
-            chunk_words = words[start:end]
-            if not chunk_words:
-                break
-            chunks.append(" ".join(chunk_words))
-            if end == len(words):
-                break
-            start = max(0, end - overlap)
+        current_lines: list[str] = []
+        current_words: list[str] = []
+
+        def flush() -> list[str]:
+            if not current_words:
+                return []
+            chunks.append("\n".join(current_lines))
+            return current_words[-overlap:] if overlap else []
+
+        for line in normalized.splitlines():
+            words = line.split()
+            if not words:
+                continue
+
+            if len(words) > chunk_size:
+                carry = flush()
+                current_lines.clear()
+                current_words.clear()
+                step = chunk_size - overlap
+                for start in range(0, len(words), step):
+                    window = words[start : start + chunk_size]
+                    chunks.append(" ".join(window))
+                    if start + chunk_size >= len(words):
+                        break
+                continue
+
+            if current_words and len(current_words) + len(words) > chunk_size:
+                carry = flush()
+                current_lines.clear()
+                current_words.clear()
+                available_overlap = chunk_size - len(words)
+                carry = carry[-available_overlap:] if available_overlap else []
+                if carry:
+                    current_lines.append(" ".join(carry))
+                    current_words.extend(carry)
+
+            current_lines.append(line)
+            current_words.extend(words)
+
+        flush()
         return chunks
 
     def _parse_text(self, path: Path) -> str:
@@ -157,7 +220,10 @@ class DocumentProcessingService:
 
         try:
             with fitz.open(path) as document:
-                text = "\n".join(page.get_text("text") for page in document)
+                text = "\n".join(
+                    f"Page {index + 1}:\n{page.get_text('text')}"
+                    for index, page in enumerate(document)
+                )
             return text.encode("utf-8", errors="replace").decode("utf-8")
         except Exception as exc:
             raise RuntimeError(f"Failed to extract text from PDF '{path.name}'.") from exc
@@ -172,10 +238,21 @@ class DocumentProcessingService:
 
         try:
             document = Document(path)
-            return "\n".join(
-                paragraph.text.strip()
-                for paragraph in document.paragraphs
-                if paragraph.text.strip()
-            )
+            extracted_text = []
+            for item in document.iter_inner_content():
+                if hasattr(item, "style") and hasattr(item, "text"):
+                    text = item.text.strip()
+                    if not text:
+                        continue
+                    if item.style.name.startswith("Heading"):
+                        extracted_text.append(f"## {text}")
+                    else:
+                        extracted_text.append(text)
+                elif hasattr(item, "rows"):
+                    for row in item.rows:
+                        values = [cell.text.strip() for cell in row.cells]
+                        if any(values):
+                            extracted_text.append(" | ".join(values))
+            return "\n".join(extracted_text)
         except Exception as exc:
             raise RuntimeError(f"Failed to extract text from DOCX '{path.name}'.") from exc

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -14,6 +14,12 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    source_metadata = Column(
+        JSON,
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
 
     document = relationship("Document", back_populates="chunks")
     embedding = relationship("DocumentEmbedding", back_populates="chunk", cascade="all, delete-orphan")

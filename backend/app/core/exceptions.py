@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
@@ -5,7 +7,9 @@ from starlette import status
 from starlette.responses import JSONResponse
 
 from app.core.error_codes import TestNovaErrorCodes
-from app.core.responses import ApiResponse, ErrorDetail, error_response
+from app.core.responses import ErrorDetail, error_response
+
+logger = logging.getLogger(__name__)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -36,11 +40,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(SQLAlchemyError)
     async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
-
-        print("\n" + "=" * 80)
-        print("SQLAlchemy Error:")
-        print(repr(exc))
-        print("=" * 80 + "\n")
+        logger.error(
+            "Database operation failed: path=%s error_type=%s",
+            request.url.path,
+            type(exc).__name__,
+        )
         payload = error_response(
             message="Database operation failed",
             data=None,

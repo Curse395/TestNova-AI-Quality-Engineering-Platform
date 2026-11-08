@@ -1,4 +1,4 @@
-from pydantic import BaseModel,Field,ConfigDict
+from pydantic import BaseModel,Field
 from typing import Literal
 
 __test__=False
@@ -24,22 +24,3 @@ class GeneratedTestCase(BaseModel):
     steps: list[TestCaseStep] = Field(min_length=1, max_length=30)
     expected_result: str = Field(min_length=1)
     evidence_chunk_ids: list[int] = Field(min_length=1)
-
-class TestCaseGenerationResponse(BaseModel):
-    success: bool
-    message: str
-    generated_count: int
-    test_cases: list[dict]
-
-class TestCaseResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    project_id: int
-    title: str
-    description: str
-    category: TestCategory
-    priority: TestPriority
-    preconditions: str | None
-    steps: list[TestCaseStep]
-    expected_result: str
-    review_status: str

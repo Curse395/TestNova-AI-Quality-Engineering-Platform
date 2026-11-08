@@ -6,7 +6,6 @@ from app.core.dependencies import CurrentUser
 from app.database.connection import get_db
 from app.schemas.test_case_schema import TestCaseGenerationRequest
 from app.services.project_service import ProjectService
-from app.services.test_case_evaluation_service import TestCaseEvaluationService
 from app.agents.test_generation_agent import TestGenerationAgent
 from app.services.test_case_evaluation_service import TestCaseEvaluationService
 from app.agents.contracts import AgentContext
@@ -36,6 +35,7 @@ class ChangeRiskRequest(BaseModel):
 
         if not value:
             raise ValueError("Change type cannot be empty")
+        return value
 
 
 
@@ -206,7 +206,8 @@ def review_test_case(
         "success": True,
         "agent": result.agent_name,
         "status": result.status,
-        "review": result.data
+        "review": result.data,
+        "evidence": result.evidence,
     }
 
 @router.post("/{project_id}/test-analysis/analyze")

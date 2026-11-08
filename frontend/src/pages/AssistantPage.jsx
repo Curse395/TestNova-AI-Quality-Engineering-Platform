@@ -9,7 +9,7 @@ import {
   sendMessage,
 } from '../api/chat'
 import { fetchDashboard } from '../api/dashboard'
-import { apiClient } from '../api/client'
+import { fetchProjects } from '../api/projects'
 
 /* ------------------------------------------------------------------ */
 /*  Suggestion → prompt mapping                                        */
@@ -88,7 +88,9 @@ const SourceCitation = ({ sources }) => {
       <div className="space-y-2">
         {sources.map((src, i) => (
           <div key={i} className="flex items-center justify-between text-sm">
-            <span className="flex items-center gap-2 text-slate-300">📄 {src.document_name}</span>
+            <span className="flex items-center gap-2 text-slate-300">
+              📄 {src.document_name}{src.source_type ? ` · ${src.source_type.replaceAll('_', ' ')}` : ''}
+            </span>
             <span className="text-xs text-slate-500">Similarity: {Number(src.score).toFixed(2)}</span>
           </div>
         ))}
@@ -168,14 +170,10 @@ const AssistantPage = () => {
 
     async function init() {
       try {
-        const [projRes, dashData] = await Promise.all([
-          apiClient.get('/projects/'),
+        const [projList, dashData] = await Promise.all([
+          fetchProjects(),
           fetchDashboard().catch(() => null),
         ])
-        const projList = projRes.data?.data
-        if (!Array.isArray(projList)) {
-          throw new Error('Unexpected project list response.')
-        }
         if (cancelled) return
 
         setProjects(projList)

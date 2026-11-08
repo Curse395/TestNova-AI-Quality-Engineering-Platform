@@ -101,7 +101,10 @@ class TestCaseGenerationService:
                 project_id,
                 len(missing_chunk_ids),
             )
-            EmbeddingService(self.db).generate_embeddings(missing_chunk_ids)
+            EmbeddingService(self.db).generate_embeddings(
+                project_id=project_id,
+                chunk_ids=missing_chunk_ids,
+            )
             chunks = self.retrieval_service.search_project_context(
                 current_user_id=user_id,
                 project_id=project_id,
@@ -145,6 +148,8 @@ class TestCaseGenerationService:
             "chunk_id":chunk["chunk_id"],
             "document_id":chunk["document_id"],
             "document_name":chunk["document_name"],
+            "source_type":chunk.get("source_type", "document"),
+            "source_metadata":chunk.get("source_metadata", {}),
             "content":chunk["content"]
             }
             for chunk in chunks]
@@ -442,6 +447,13 @@ Every case must cite at least one supplied evidence chunk ID.
                     "steps": item.steps,
                     "expected_result": item.expected_result,
                     "review_status": item.review_status,
+                    "evidence": [
+                        {
+                            "document_id": link.document_id,
+                            "chunk_id": link.chunk_id,
+                        }
+                        for link in item.evidence
+                    ],
                     }
                     for item in saved_cases
                 ]                    

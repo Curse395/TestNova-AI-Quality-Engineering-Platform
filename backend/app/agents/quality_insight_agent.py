@@ -2,6 +2,7 @@ import logging
 
 from app.agents.base import BaseAgent
 from app.agents.contracts import AgentContext, AgentResult
+from app.agents.execution_metrics import summarize_execution_statuses
 from app.services.analytics_service import AnalyticsService
 from app.services.test_execution_service import TestExecutionService
 from app.services.llm_services import LLMService
@@ -40,19 +41,19 @@ class QualityInsightAgent(BaseAgent):
 
             executions = history.get("executions", [])
 
+            all_status_counts = summarize_execution_statuses(
+                executions,
+                unknown_status="other",
+            )
             status_counts = {
-                "passed": 0,
-                "failed": 0,
-                "error": 0,
-                "other": 0,
+                status: all_status_counts.get(status, 0)
+                for status in ("passed", "failed", "error")
             }
-
-            for execution in executions:
-                status = execution.get("status", "other")
-                if status in status_counts:
-                    status_counts[status] += 1
-                else:
-                    status_counts["other"] += 1
+            status_counts["other"] = sum(
+                count
+                for status, count in all_status_counts.items()
+                if status not in status_counts
+            )
 
             total_executions = len(executions)
 

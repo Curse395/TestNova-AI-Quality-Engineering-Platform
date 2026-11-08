@@ -1,6 +1,7 @@
-import { NavLink } from 'react-router-dom'
-import { Bot, BarChart3, FolderKanban, LayoutGrid, Upload } from 'lucide-react'
-import { navItems } from '../../data/mockData'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Bot, BarChart3, FolderKanban, LayoutGrid, LogOut, Upload } from 'lucide-react'
+import Button from '../ui/Button'
+import { navItems } from '../../data/navigation'
 
 const icons = {
   LayoutGrid,
@@ -11,6 +12,13 @@ const icons = {
 }
 
 const Sidebar = () => {
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token')
+    navigate('/login', { replace: true })
+  }
+
   return (
     <aside className="hidden w-72 flex-col border-r border-slate-800/80 bg-slate-950/80 px-6 py-8 lg:flex">
       <div className="mb-10">
@@ -42,9 +50,13 @@ const Sidebar = () => {
       </nav>
 
       <div className="mt-auto rounded-3xl border border-sky-500/20 bg-sky-500/10 p-4">
-        <p className="text-sm font-semibold text-sky-200">AI autopilot enabled</p>
-        <p className="mt-1 text-sm text-slate-400">Coverage and release confidence are trending upward.</p>
+        <p className="text-sm font-semibold text-sky-200">Workspace insights</p>
+        <p className="mt-1 text-sm text-slate-400">Review document processing and embedding health.</p>
       </div>
+      <Button variant="ghost" className="mt-4 justify-start gap-3" onClick={handleLogout}>
+        <LogOut size={18} />
+        Sign out
+      </Button>
     </aside>
   )
 }

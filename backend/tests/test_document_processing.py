@@ -71,7 +71,7 @@ def test_document_processing_pipeline():
     document_id = upload_response.json()["data"]["id"]
     process_response = client.post(f"/documents/{document_id}/process", headers=headers)
 
-    assert process_response.status_code == 200
+    assert process_response.status_code == 200, process_response.text
     payload = process_response.json()["data"]
     assert payload["document_id"] == document_id
     assert payload["chunks_created"] >= 1
@@ -88,6 +88,8 @@ def test_document_processing_pipeline():
         assert len(chunks) == payload["chunks_created"]
         assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
         assert all(chunk.content for chunk in chunks)
+        assert all(chunk.source_metadata["source_type"] == "document" for chunk in chunks)
+        assert all(chunk.source_metadata["file_type"] == ".txt" for chunk in chunks)
         assert db.query(DocumentEmbedding).count() == 0
     finally:
         db.close()

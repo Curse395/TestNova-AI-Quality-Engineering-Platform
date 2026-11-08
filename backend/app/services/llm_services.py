@@ -1,10 +1,7 @@
-import os
 import logging
 from google import genai
 from google.genai import types 
-from dotenv import load_dotenv
-
-load_dotenv()
+from app.core.config import settings
 
 logger=logging.getLogger(__name__)
 
@@ -12,15 +9,12 @@ class LLMService:
 
     def __init__(self):
 
-        self.api_key=os.getenv("GEMINI_API_KEY")
-        self.model_name=os.getenv(
-            "GEMINI_MODEL",
-            "gemini-3.5-flash"
-        )
-        self.temperature=float(os.getenv("TEMPERATURE","0.2"))
-        self.max_output_tokens=int(os.getenv("MAX_OUTPUT_TOKENS","4096"))
-        self.top_p=float(os.getenv("TOP_P","0.95"))
-        self.top_k=int(os.getenv("TOP_K","40"))
+        self.api_key = settings.GEMINI_API_KEY
+        self.model_name = settings.GEMINI_MODEL
+        self.temperature = settings.TEMPERATURE
+        self.max_output_tokens = settings.MAX_OUTPUT_TOKENS
+        self.top_p = settings.TOP_P
+        self.top_k = settings.TOP_K
 
         self._validate_configuration()
         self.client=self._initialize_client()
