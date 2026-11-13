@@ -18,12 +18,51 @@ export async function deleteProject(projectId) {
   return data.data
 }
 
-export async function fetchProjectAnalytics(projectId) {
-  const [overview, documents] = await Promise.all([
+export async function fetchProjectAnalytics(
+  projectId,
+  bucket = 'day',
+  dateRange = {},
+) {
+  const [overview, documents, testCases, coverage, executions, executionTrends, risks, workflowMonitoring] = await Promise.all([
     apiClient.get(`/analytics/overview/${projectId}`),
     apiClient.get(`/analytics/documents/${projectId}`),
+    apiClient.get(`/analytics/test-cases/${projectId}`),
+    apiClient.get(`/analytics/coverage/${projectId}`),
+    apiClient.get(`/analytics/executions/${projectId}`, {
+      params: dateRange,
+    }),
+    apiClient.get(`/analytics/execution-trends/${projectId}`, {
+      params: { bucket, ...dateRange },
+    }),
+    apiClient.get(`/analytics/risks/${projectId}`),
+    apiClient.get(`/analytics/workflows/${projectId}`),
   ])
-  return { overview: overview.data, documents: documents.data }
+  return {
+    overview: overview.data,
+    documents: documents.data,
+    testCases: testCases.data,
+    coverage: coverage.data,
+    executions: executions.data,
+    executionTrends: executionTrends.data,
+    risks: risks.data,
+    workflowMonitoring: workflowMonitoring.data,
+  }
+}
+
+export async function generateProjectQualitySummary(projectId) {
+  const { data } = await apiClient.post(`/analytics/quality-summary/${projectId}`)
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Unexpected quality summary response.')
+  }
+  return data
+}
+
+export async function fetchProjectReleaseReadiness(projectId) {
+  const { data } = await apiClient.get(`/analytics/release-readiness/${projectId}`)
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Unexpected release readiness response.')
+  }
+  return data
 }
 
 export async function fetchProjectDocuments(projectId) {

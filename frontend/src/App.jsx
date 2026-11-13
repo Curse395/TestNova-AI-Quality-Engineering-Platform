@@ -8,6 +8,7 @@ import UploadPage from './pages/UploadPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AssistantPage from './pages/AssistantPage'
 import TestCasesPage from './pages/TestCasesPage'
+import ReleaseReadinessPage from './pages/ReleaseReadinessPage'
 
 function AppShell({ children }) {
   return (
@@ -51,6 +52,7 @@ function App() {
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/assistant" element={<AssistantPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="/release-readiness" element={<ReleaseReadinessPage />} />
                 </Routes>
               </AppShell>
             </RequireAuth>

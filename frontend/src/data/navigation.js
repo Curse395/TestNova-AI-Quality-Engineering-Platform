@@ -5,4 +5,5 @@ export const navItems = [
   { label: 'Test Cases', icon: 'ClipboardCheck', href: '/test-cases' },
   { label: 'Quality Analytics', icon: 'BarChart3', href: '/analytics' },
   { label: 'AI Assistant', icon: 'Bot', href: '/assistant' },
+  { label: 'Release Readiness', icon: 'ShieldCheck', href: '/release-readiness' },
 ]

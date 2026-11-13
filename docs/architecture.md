@@ -39,19 +39,115 @@ The main routed workflows are:
 - **Upload:** `POST /uploads/`, `GET /uploads/project/{project_id}`,
   `POST /documents/{document_id}/process`, and
   `POST /embeddings/regenerate`.
-- **Analytics:** `GET /analytics/overview/{project_id}` and
-  `GET /analytics/documents/{project_id}`.
+- **Analytics:** `GET /analytics/overview/{project_id}`,
+  `GET /analytics/documents/{project_id}`,
+  `GET /analytics/test-cases/{project_id}`,
+  `GET /analytics/coverage/{project_id}`,
+  `GET /analytics/executions/{project_id}`, and
+  `GET /analytics/execution-trends/{project_id}`,
+  `GET /analytics/risks/{project_id}`,
+  `GET /analytics/workflows/{project_id}`,
+  `POST /analytics/quality-summary/{project_id}`, and
+  `GET /analytics/release-readiness/{project_id}`.
 - **Dashboard:** `GET /dashboard/` and `GET /dashboard/insights`.
 - **Assistant:** chat session and chat endpoints under `/chat`.
 
 The project, document, analytics, and dashboard pages consume these live
 endpoints. Sidebar navigation is configuration, not sample data. Dashboard
-knowledge and health values are derived from document processing and embedding
-counts; they are not test execution or production release measurements. Test
+metrics report document, chunk, and embedding counts and their separate
+coverage ratios; they are not test-execution or production-release
+measurements. Coverage is unavailable when its denominator is empty. Test
 generation impact fields are currently returned as unavailable rather than
 presenting formula-generated values as measured results.
 
 ## API, service, and persistence layers
+
+Quality analytics aggregate persisted test cases, requirement links, and
+execution runs for an owner-authorized project. Test-case distributions keep
+unexpected, missing, and blank values separate. Requirement links measure
+traceability, not completeness of testing; the primary traceability rate counts
+explicit requirements linked to at least one approved case, while the
+secondary rate includes links to any case. Execution summaries count runs
+(including retries/repeats), classify missing/blank/unknown statuses separately,
+and report duration statistics only for finite, non-negative values. Execution
+trend queries use UTC timestamps and half-open `[from, to)` ranges. Trends
+default to the trailing 30 days with daily buckets; supported buckets are day,
+Monday-start week, and calendar month. Explicit ranges are limited to 366 days.
+
+Stage 3 project risk analytics reuse persisted change-risk workflow-task outputs
+and persisted execution runs. Change-impact risks are explicitly marked
+AI-inferred and use the persisted agent severity label without exposing its
+heuristic risk score; failed/error execution totals are observed facts with
+unclassified severity. The risk endpoint reads at most the latest 100 change
+risk tasks and attaches at most 20 failed/error run references. The risk-task
+window can be incomplete when older records are omitted. The endpoint returns
+at most 100 prioritized risk records while distribution totals cover all
+findings in the queried task window. AI summaries include at most 30 of those
+findings to bound provider input size.
+
+The workflow monitoring endpoint returns at most 100 owner-scoped persisted
+workflow snapshots (20 by default), including ordered task and attempt status,
+timestamps, durations, retry counts, and sanitized diagnostics. It does not
+provide a live event stream or progress percentage. Inputs, prompts, model
+outputs, and credentials are not included in this monitoring response.
+Plan order follows task creation; observed execution order follows persisted
+start timestamps, and concurrently running tasks may overlap.
+
+The AI quality-summary endpoint is an explicit POST operation. It aggregates
+existing quality analytics and persisted risk evidence, sends only those
+aggregates to the provider-neutral LLM service, and validates the JSON against
+a Pydantic schema with evidence-reference checks. Valid summaries are cached
+in a bounded process-local LRU by evidence fingerprint; cache state is not
+shared between workers and is lost on restart. The summary distinguishes
+observations from interpretation and cannot make release-readiness claims.
+Its execution trend input covers the last 30 complete UTC days to keep the
+evidence fingerprint stable within a day.
+Schema and evidence-ID validation do not guarantee that each generated
+statement is semantically entailed by its cited evidence; human review remains
+appropriate before relying on generated interpretations.
+
+The project-level release-readiness endpoint composes Stage 2 quality metrics
+and Stage 3 risk and workflow evidence; it does not duplicate their aggregation
+rules. Its response includes test-case distributions, explicit/inferred
+requirement traceability, lifetime execution summaries, a trailing 30-day UTC
+execution trend, up to 10 recent execution runs, risk findings, and up to 20
+recent persisted workflow snapshots. Execution time bounds are derived from
+persisted run timestamps. Workflow counts describe only the bounded snapshot.
+Missing metric fields remain unavailable and are not converted to zero.
+
+The deterministic release assessment follows these ordered rules:
+
+1. **Blocked:** at least one persisted execution run is classified as failed
+   or error. This rule takes precedence even if other evidence is missing.
+2. **Insufficient evidence:** a required analytics source or required metric is
+   unavailable; there are no execution runs; runs exist but none have a
+   recognized passed/failed status; there are no approved test cases; or there
+   are no explicit requirements. Missing evidence is not a successful result.
+3. **Attention required:** no higher-priority state applies, but a relevant
+   concern remains, including explicit requirements without approved-case
+   links, draft/rejected cases, high/critical AI-assessed risks, bounded risk
+   history, unavailable persisted risk evidence, failed/partial recent
+   workflows, or skipped/unknown/missing/blank execution statuses.
+4. **Ready for review:** the required evidence exists and no blocker or
+   medium/high attention condition is present. This is a review handoff, not a
+   release approval, production-readiness claim, probability, or score.
+
+Observed failed/error execution outcomes are blockers. Risk severity is shown
+as an AI-assessed category and never translated into a numerical probability.
+Workflow failures are operational concerns, not test-execution failures.
+Requirement traceability uses explicit requirements as its denominator;
+inferred requirements are shown separately, and links do not establish that a
+requirement is fully or adequately tested. Pass rate is
+`passed / (passed + failed)` and remains unavailable when that denominator is
+zero. Duration statistics use only valid persisted values, preserving
+unavailable counts separately. Concern records include source, evidence IDs
+where available, explanation, attention level, and a suggested next action.
+
+The optional AI-generated quality context reuses the existing explicit
+quality-summary operation. It retains its evidence references and limitations
+and cannot override the deterministic assessment. Both the deterministic
+assessment and the AI text require human review; no live-provider behavior is
+certified by offline tests.
 
 FastAPI routers are assembled in `backend/app/main.py`; exception handlers
 provide a common error envelope for HTTP, validation, database, and unexpected
@@ -130,7 +226,8 @@ are omitted rather than inferred.
 `EmbeddingService` uses the Sentence Transformers
 `all-MiniLM-L6-v2` model and stores 384-dimensional vectors through pgvector.
 Generation is scoped to a project and can be narrowed to selected documents or
-chunks. Embedding activity snapshots feed the dashboard's processing trend.
+chunks. Count-change snapshots feed the dashboard's knowledge-index history;
+they are sparse activity records, not execution-performance measurements.
 
 `RetrievalService` first checks project ownership and optional document/source
 type scope, encodes the query with the same configured model used for document
