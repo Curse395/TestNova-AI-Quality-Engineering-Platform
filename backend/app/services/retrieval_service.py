@@ -4,13 +4,12 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.authorization import get_owned_project
 from app.core.config import settings
 from app.services.model_service import ModelService
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
-from app.models.organization import Organization
-from app.models.project import Project
 
 logger = logging.getLogger(__name__)
 
@@ -42,15 +41,7 @@ class RetrievalService:
         source_types: list[str] | None = None,
         min_similarity: float | None = None,
     ) -> list[dict[str, object]]:
-        project = (
-            self.db.query(Project)
-            .join(Organization)
-            .filter(
-                Project.id == project_id,
-                Organization.owner_id == current_user_id,
-            )
-            .first()
-        )
+        project = get_owned_project(self.db, project_id, current_user_id)
         if not project:
             raise ValueError("Project not found")
         if not query.strip():

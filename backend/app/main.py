@@ -1,14 +1,17 @@
-import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases,test_execution,knowledge
+from app.api import auth, document_processing, embeddings, knowledge_base, projects, retrieval, uploads, chat, analytics,dashboard,test_cases,test_execution,knowledge,workflows
 from app.core.exceptions import register_exception_handlers
 from app.core.config import settings
+from app.core.request_context import (
+    RequestContextMiddleware,
+    configure_structured_logging,
+)
 from app.database.connection import Base, engine
-from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence,test_case_generation_run
+from app.models import document, document_chunk, document_embedding, organization, project, user,project_activity,chat_history,chat_session,test_case,test_case_evidence,test_case_generation_run,project_requirement,test_case_requirement,workflow_run,workflow_task,workflow_task_attempt
 
 
-logging.basicConfig(level=logging.INFO)
+configure_structured_logging()
 
 if settings.AUTO_CREATE_SCHEMA:
     Base.metadata.create_all(bind=engine)
@@ -28,6 +31,7 @@ app.include_router(dashboard.router)
 app.include_router(test_cases.router)
 app.include_router(test_execution.router)
 app.include_router(knowledge.router)
+app.include_router(workflows.router)
 register_exception_handlers(app)
 
 app.add_middleware(
@@ -37,6 +41,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+app.add_middleware(RequestContextMiddleware)
 
 
 @app.get("/")

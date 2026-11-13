@@ -15,11 +15,16 @@ from app.models import (
     organization,
     project,
     project_activity,
+    project_requirement,
     test_case,
     test_case_evidence,
     test_case_generation_run,
+    test_case_requirement,
     test_execution,
     user,
+    workflow_run,
+    workflow_task,
+    workflow_task_attempt,
 )
 
 config = context.config

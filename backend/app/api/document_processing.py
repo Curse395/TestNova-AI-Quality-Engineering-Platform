@@ -1,30 +1,43 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.authorization import get_owned_document
 from app.core.dependencies import CurrentUser
+from app.core.file_storage import resolve_document_storage_path
 from app.core.responses import ApiResponse
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 from app.models.document import Document
-from app.models.organization import Organization
-from app.models.project import Project
 from app.schemas.document_processing_schema import DocumentProcessingResponse
 from app.services.document_processing_service import DocumentProcessingService
 
 router = APIRouter(prefix="/documents", tags=["Document Processing"])
 
 
-@router.post("/{document_id}/process")
+@router.post(
+    "/{document_id}/process",
+    dependencies=[Depends(limit_requests("document-process", limit=5, window_seconds=60))],
+)
 def process_document(
     document_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = None,
 ) -> ApiResponse:
-    document = db.query(Document).join(Project).join(Organization).filter(Document.id == document_id).first()
-    if not document:
+    document = get_owned_document(db, document_id, current_user.id)
+    if document is None:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    if document.project.organization.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to process this document")
+    try:
+        document.storage_path = str(
+            resolve_document_storage_path(
+                document.storage_path,
+                document.project_id,
+            )
+        )
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        ) from exc
 
     claimed = (
         db.query(Document)
@@ -51,15 +64,21 @@ def process_document(
     except (OSError, ValueError, RuntimeError) as exc:
         db.rollback()
         document.processing_status = "failed"
-        document.processing_error = str(exc)
+        document.processing_error = "Document processing failed validation."
         db.commit()
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail="The document could not be processed.",
+        ) from exc
+    except Exception as exc:
         db.rollback()
         document.processing_status = "failed"
         document.processing_error = "Document processing failed unexpectedly."
         db.commit()
-        raise
+        raise HTTPException(
+            status_code=500,
+            detail="The document could not be processed.",
+        ) from exc
 
     document.processing_status = "completed"
     document.processing_error = None

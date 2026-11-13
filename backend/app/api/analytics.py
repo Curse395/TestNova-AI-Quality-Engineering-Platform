@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 from app.schemas.quality_summary_schema import QualitySummaryResponse
 from app.schemas.release_readiness_schema import ReleaseReadinessResponse
@@ -82,7 +83,10 @@ def get_requirement_traceability(
         _raise_analytics_error(exc)
 
 
-@router.get("/executions/{project_id}")
+@router.get(
+    "/executions/{project_id}",
+    dependencies=[Depends(limit_requests("execution-analytics", limit=30, window_seconds=60))],
+)
 def get_execution_analytics(
     project_id: int,
     current_user: CurrentUser,
@@ -101,7 +105,10 @@ def get_execution_analytics(
         _raise_analytics_error(exc)
 
 
-@router.get("/execution-trends/{project_id}")
+@router.get(
+    "/execution-trends/{project_id}",
+    dependencies=[Depends(limit_requests("execution-trends", limit=30, window_seconds=60))],
+)
 def get_execution_trends(
     project_id: int,
     current_user: CurrentUser,
@@ -122,7 +129,10 @@ def get_execution_trends(
         _raise_analytics_error(exc)
 
 
-@router.get("/risks/{project_id}")
+@router.get(
+    "/risks/{project_id}",
+    dependencies=[Depends(limit_requests("risk-analytics", limit=20, window_seconds=60))],
+)
 def get_project_risks(
     project_id: int,
     current_user: CurrentUser,
@@ -137,7 +147,10 @@ def get_project_risks(
         _raise_analytics_error(exc)
 
 
-@router.get("/workflows/{project_id}")
+@router.get(
+    "/workflows/{project_id}",
+    dependencies=[Depends(limit_requests("workflow-analytics", limit=30, window_seconds=60))],
+)
 def get_workflow_monitoring(
     project_id: int,
     current_user: CurrentUser,
@@ -157,6 +170,7 @@ def get_workflow_monitoring(
 @router.post(
     "/quality-summary/{project_id}",
     response_model=QualitySummaryResponse,
+    dependencies=[Depends(limit_requests("quality-summary", limit=5, window_seconds=60))],
 )
 def generate_quality_summary(
     project_id: int,
@@ -175,6 +189,7 @@ def generate_quality_summary(
 @router.get(
     "/release-readiness/{project_id}",
     response_model=ReleaseReadinessResponse,
+    dependencies=[Depends(limit_requests("release-readiness-analytics", limit=30, window_seconds=60))],
 )
 def get_project_release_readiness(
     project_id: int,

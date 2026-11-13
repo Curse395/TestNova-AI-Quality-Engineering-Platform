@@ -6,11 +6,10 @@ from typing import Any, Iterable
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.authorization import get_owned_project
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
-from app.models.organization import Organization
-from app.models.project import Project
 from app.models.project_requirement import ProjectRequirement
 from app.models.test_case import TestCase
 from app.models.test_case_requirement import TestCaseRequirement
@@ -283,15 +282,7 @@ class AnalyticsService:
         return result
 
     def _require_owned_project(self, project_id: int, current_user_id: int) -> None:
-        project = (
-            self.db.query(Project)
-            .join(Organization)
-            .filter(
-                Project.id == project_id,
-                Organization.owner_id == current_user_id,
-            )
-            .first()
-        )
+        project = get_owned_project(self.db, project_id, current_user_id)
         if project is None:
             raise ValueError("Project not found")
 

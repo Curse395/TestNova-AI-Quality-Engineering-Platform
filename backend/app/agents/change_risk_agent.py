@@ -210,6 +210,10 @@ Analyse the change and return the requested JSON.
             ):
                 raise ValueError("Invalid risk score returned by the model.")
 
+            confidence = str(analysis.get("confidence", "")).lower()
+            if confidence not in {"low", "medium", "high"}:
+                raise ValueError("Invalid confidence returned by the model.")
+
             expected_lists = [
                 "affected_areas",
                 "risk_factors",
@@ -219,7 +223,9 @@ Analyse the change and return the requested JSON.
             ]
 
             for field in expected_lists:
-                if not isinstance(analysis.get(field), list):
+                if not isinstance(analysis.get(field), list) or any(
+                    not isinstance(item, str) for item in analysis[field]
+                ):
                     raise ValueError(
                         f"Invalid analysis field: {field}"
                     )
@@ -228,6 +234,7 @@ Analyse the change and return the requested JSON.
                 **analysis,
                 "risk_level": risk_level.capitalize(),
                 "risk_score": risk_score,
+                "confidence": confidence.capitalize(),
                 "evidence_count": len(evidence),
                 "model": llm_response.get("model")
             }

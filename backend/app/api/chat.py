@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends,HTTPException
 from sqlalchemy.orm import Session
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 from app.services.chat_service import ChatService
 from app.services.chat_history_service import ChatHistoryService
@@ -116,7 +117,10 @@ def delete_chat_session(
     return {"message": "Chat session deleted successfully"}
 
 
-@router.post("/")
+@router.post(
+    "/",
+    dependencies=[Depends(limit_requests("chat-generation", limit=20, window_seconds=60))],
+)
 def chat(
     session_id: int,
     project_id: int,
@@ -134,4 +138,7 @@ def chat(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=502,
+            detail="The AI service is temporarily unavailable.",
+        ) from exc

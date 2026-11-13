@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, LogOut, ShieldCheck, Upload } from 'lucide-react'
+import { Activity, Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, LogOut, ShieldCheck, Upload } from 'lucide-react'
 import Button from '../ui/Button'
 import { navItems } from '../../data/navigation'
 
@@ -10,6 +10,7 @@ const icons = {
   BarChart3,
   ClipboardCheck,
   Bot,
+  Activity,
   ShieldCheck,
 }
 

@@ -1,0 +1,156 @@
+{
+  "dataset_version": "1.0.0",
+  "dataset_name": "TestNova synthetic evidence-grounded test-case generation",
+  "description": "Small synthetic examples for repeatable offline and explicitly opted-in live provider evaluation.",
+  "examples": [
+    {
+      "id": "SYN-AUTH-POS-001",
+      "scenario_type": "positive",
+      "requirements_prompt": "Generate a test case for SYN-AUTH-1. Do not infer authentication behavior beyond the supplied evidence.",
+      "evidence_chunks": [
+        {
+          "id": 71001,
+          "content": "Synthetic example. SYN-AUTH-1: A registered user who submits the correct email address and password is signed in and taken to the project dashboard."
+        }
+      ],
+      "expected_requirement_coverage": ["SYN-AUTH-1"],
+      "expected_categories": ["positive"],
+      "unsupported_behaviors": [
+        "password complexity rules",
+        "multi-factor authentication",
+        "account lockout"
+      ],
+      "annotations": [
+        {
+          "requirement_key": "SYN-AUTH-1",
+          "evidence_ids": [71001],
+          "evidence_quote": "A registered user who submits the correct email address and password is signed in and taken to the project dashboard."
+        }
+      ],
+      "known_constraints": [
+        "The evidence specifies only the successful sign-in result."
+      ],
+      "scoring_guidance": "A supported case must use the successful registered-user flow and cite chunk 71001."
+    },
+    {
+      "id": "SYN-AUTH-NEG-002",
+      "scenario_type": "negative",
+      "requirements_prompt": "Generate a negative test case for SYN-AUTH-2 using only the documented validation behavior.",
+      "evidence_chunks": [
+        {
+          "id": 71011,
+          "content": "Synthetic example. SYN-AUTH-2: Submitting the sign-in form with an empty email address is rejected and displays the message Email is required."
+        }
+      ],
+      "expected_requirement_coverage": ["SYN-AUTH-2"],
+      "expected_categories": ["negative"],
+      "unsupported_behaviors": [
+        "invalid password error message",
+        "account lockout",
+        "email address format validation"
+      ],
+      "annotations": [
+        {
+          "requirement_key": "SYN-AUTH-2",
+          "evidence_ids": [71011],
+          "evidence_quote": "Submitting the sign-in form with an empty email address is rejected and displays the message Email is required."
+        }
+      ],
+      "known_constraints": [
+        "Only the empty-email behavior and its message are specified."
+      ],
+      "scoring_guidance": "Do not infer validation for malformed addresses, passwords, or lockout."
+    },
+    {
+      "id": "SYN-CART-BOUNDARY-003",
+      "scenario_type": "boundary",
+      "requirements_prompt": "Generate boundary and negative test cases for SYN-CART-1. Keep each case tied to an explicit limit.",
+      "evidence_chunks": [
+        {
+          "id": 71021,
+          "content": "Synthetic example. SYN-CART-1: Checkout accepts orders containing from one through five item lines. An order containing more than five item lines is rejected before payment."
+        },
+        {
+          "id": 71022,
+          "content": "Synthetic example. The checkout limit applies to item lines in one order; it does not specify a quantity limit per line."
+        }
+      ],
+      "expected_requirement_coverage": ["SYN-CART-1"],
+      "expected_categories": ["boundary", "negative"],
+      "unsupported_behaviors": [
+        "maximum quantity per item line",
+        "empty order checkout",
+        "automatic cart truncation"
+      ],
+      "annotations": [
+        {
+          "requirement_key": "SYN-CART-1",
+          "evidence_ids": [71021, 71022],
+          "evidence_quote": "Checkout accepts orders containing from one through five item lines."
+        }
+      ],
+      "known_constraints": [
+        "The maximum is five item lines.",
+        "No per-line quantity limit is specified."
+      ],
+      "scoring_guidance": "A five-line accepted case and/or a greater-than-five rejection case are supported. Do not turn the item-line limit into a quantity limit."
+    },
+    {
+      "id": "SYN-RESET-EDGE-004",
+      "scenario_type": "edge",
+      "requirements_prompt": "Generate a test case for the documented reset-code expiry behavior in SYN-RESET-1.",
+      "evidence_chunks": [
+        {
+          "id": 71031,
+          "content": "Synthetic example. SYN-RESET-1: A password reset code expires fifteen minutes after it is issued. A code used after expiration is rejected."
+        },
+        {
+          "id": 71032,
+          "content": "Synthetic example. The reset flow does not document a response for a code used exactly at the fifteen-minute boundary."
+        }
+      ],
+      "expected_requirement_coverage": ["SYN-RESET-1"],
+      "expected_categories": ["edge"],
+      "unsupported_behaviors": [
+        "code used exactly at fifteen minutes is accepted",
+        "code used exactly at fifteen minutes is rejected",
+        "reset code can be reused"
+      ],
+      "annotations": [
+        {
+          "requirement_key": "SYN-RESET-1",
+          "evidence_ids": [71031, 71032],
+          "evidence_quote": "A password reset code expires fifteen minutes after it is issued."
+        }
+      ],
+      "known_constraints": [
+        "The exact-boundary behavior is unspecified."
+      ],
+      "scoring_guidance": "Testing a code after expiry is supported. Do not assert the exact-boundary outcome."
+    },
+    {
+      "id": "SYN-EXPORT-INSUFFICIENT-005",
+      "scenario_type": "insufficient_evidence",
+      "requirements_prompt": "Assess whether a useful test case can be generated for SYN-EXPORT-1. Do not assume what the export includes or how errors behave.",
+      "evidence_chunks": [
+        {
+          "id": 71041,
+          "content": "Synthetic example. SYN-EXPORT-1: The product has an export feature."
+        }
+      ],
+      "expected_requirement_coverage": [],
+      "expected_categories": [],
+      "unsupported_behaviors": [
+        "export format",
+        "exported fields",
+        "empty export behavior",
+        "export failure handling"
+      ],
+      "annotations": [],
+      "known_constraints": [
+        "The evidence confirms a feature exists but specifies no input, output, or observable behavior."
+      ],
+      "scoring_guidance": "Return an empty test_cases list rather than inventing export behavior."
+    }
+  ]
+}

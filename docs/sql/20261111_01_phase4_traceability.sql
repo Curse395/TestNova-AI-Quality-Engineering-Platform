@@ -1,0 +1,6 @@
+-- Superseded reference; do not execute.
+--
+-- Use 20261111_supabase_phase4_schema_reconciliation.sql as the single
+-- reviewed, additive Supabase reconciliation script. It preserves the
+-- SQLAlchemy JSON type, checks partially existing tables, and includes the
+-- required preflight and verification companions.

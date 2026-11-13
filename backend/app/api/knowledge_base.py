@@ -1,14 +1,15 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
+from app.core.authorization import get_owned_project as find_owned_project
 from app.core.dependencies import CurrentUser
 from app.core.responses import ApiResponse
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
-from app.models.organization import Organization
-from app.models.project import Project
 from app.services.retrieval_service import RetrievalService
 
 
@@ -20,15 +21,7 @@ def get_owned_project(
     current_user_id: int,
     db: Session,
 ):
-    project = (
-        db.query(Project)
-        .join(Organization)
-        .filter(
-            Project.id == project_id,
-            Organization.owner_id == current_user_id,
-        )
-        .first()
-    )
+    project = find_owned_project(db, project_id, current_user_id)
 
     if not project:
         raise HTTPException(
@@ -39,7 +32,10 @@ def get_owned_project(
     return project
 
 
-@router.post("/index")
+@router.post(
+    "/index",
+    dependencies=[Depends(limit_requests("knowledge-index", limit=5, window_seconds=60))],
+)
 def index_project_documents(
     project_id: int,
     db: Session = Depends(get_db),
@@ -98,7 +94,10 @@ def index_project_documents(
     }
 
 
-@router.get("")
+@router.get(
+    "",
+    dependencies=[Depends(limit_requests("knowledge-search", limit=30, window_seconds=60))],
+)
 def search_project_documents(
     project_id: int,
     query: str,

@@ -1,6 +1,7 @@
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.authorization import get_owned_project
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_embedding import DocumentEmbedding
@@ -64,11 +65,9 @@ class ProjectService:
         ]
 
     def update_project(self, current_user: User, project_id: int, data: ProjectUpdate) -> ProjectResponse:
-        project = self.db.query(Project).join(Organization).filter(Project.id == project_id).first()
+        project = get_owned_project(self.db, project_id, current_user.id)
         if not project:
             raise ValueError("Project not found")
-        if project.organization.owner_id != current_user.id:
-            raise PermissionError("Not authorized to update this project")
 
         if data.name is not None:
             project.name = data.name
@@ -85,21 +84,17 @@ class ProjectService:
         )
 
     def delete_project(self, current_user: User, project_id: int) -> None:
-        project = self.db.query(Project).join(Organization).filter(Project.id == project_id).first()
+        project = get_owned_project(self.db, project_id, current_user.id)
         if not project:
             raise ValueError("Project not found")
-        if project.organization.owner_id != current_user.id:
-            raise PermissionError("Not authorized to delete this project")
 
         self.db.delete(project)
         self.db.commit()
 
     def get_dashboard(self, current_user: User, project_id: int) -> dict[str, object]:
-        project = self.db.query(Project).join(Organization).filter(Project.id == project_id).first()
+        project = get_owned_project(self.db, project_id, current_user.id)
         if not project:
             raise ValueError("Project not found")
-        if project.organization.owner_id != current_user.id:
-            raise PermissionError("Not authorized to view this dashboard")
 
         documents_query = self.db.query(Document).filter(
             Document.project_id == project.id

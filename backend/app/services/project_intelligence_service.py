@@ -10,9 +10,8 @@ from typing import TYPE_CHECKING, Any, Iterable
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.authorization import get_owned_project
 from app.llm.structured_output import validate_structured_output
-from app.models.organization import Organization
-from app.models.project import Project
 from app.models.test_execution import TestExecutionRun
 from app.models.workflow_run import WorkflowRun
 from app.models.workflow_task import WorkflowTask
@@ -133,15 +132,7 @@ class ProjectIntelligenceService:
         self.summary_cache = summary_cache or _DEFAULT_SUMMARY_CACHE
 
     def require_owned_project(self, project_id: int, current_user_id: int) -> None:
-        project = (
-            self.db.query(Project)
-            .join(Organization)
-            .filter(
-                Project.id == project_id,
-                Organization.owner_id == current_user_id,
-            )
-            .first()
-        )
+        project = get_owned_project(self.db, project_id, current_user_id)
         if project is None:
             raise ValueError("Project not found")
 

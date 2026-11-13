@@ -1,0 +1,517 @@
+{
+  "report_schema_version": "1.0.0",
+  "benchmark_run_id": "gemini-real-20261113",
+  "created_at": "2026-11-13T11:52:50.951851+00:00",
+  "dataset": {
+    "name": "TestNova synthetic evidence-grounded test-case generation",
+    "version": "1.0.0",
+    "sha256": "cd0068d130f3bdb7130c1714ec973c51ccf0a5cc9cf971aeccc17be57c70c702",
+    "example_ids": [
+      "SYN-AUTH-POS-001",
+      "SYN-AUTH-NEG-002",
+      "SYN-CART-BOUNDARY-003",
+      "SYN-RESET-EDGE-004",
+      "SYN-EXPORT-INSUFFICIENT-005"
+    ],
+    "selected_example_ids": [
+      "SYN-AUTH-POS-001",
+      "SYN-AUTH-NEG-002",
+      "SYN-CART-BOUNDARY-003",
+      "SYN-RESET-EDGE-004",
+      "SYN-EXPORT-INSUFFICIENT-005"
+    ]
+  },
+  "configuration": {
+    "provider": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "temperature": 0.0,
+    "fallback_enabled": false,
+    "execution_mode": "live",
+    "max_output_tokens": 4096,
+    "top_p": 1.0,
+    "top_k": 40,
+    "response_mime_type": "application/json",
+    "system_prompt_sha256": "c957ffa1b539bb9d403f48823a049242fac666939655a152376c6e82183e36b2",
+    "user_prompt_template_sha256": "770f554f3e37acec6363b7b0b025e34d1a5a88ff6e2064d24c3800a0dfcfe235"
+  },
+  "results": [
+    {
+      "example_id": "SYN-AUTH-POS-001",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Registered user successfully signs in with correct credentials\",\"description\":\"Verify that a registered user submitting the correct email address and password is signed in and redirected to the project dashboard.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"User is registered\",\"steps\":[{\"action\":\"Submit correct email address and password\",\"expected_result\":\"User is signed in and taken to the project dashboard\"}],\"expected_result\":\"User is signed in and taken to the project dashboard\",\"evidence_chunk_ids\":[71001],\"requirement_keys\":[\"SYN-AUTH-1\"]}]}",
+      "overall_latency_ms": 2751.3060999990557,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.8627450980392157,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 0.5882352941176471,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-AUTH-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [
+            "positive"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.9411764705882353,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.5882352941176471,
+            "requested_category_quality": 1.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "request_timestamp": "2026-11-13T11:52:43.051846+00:00",
+          "completion_timestamp": "2026-11-13T11:52:45.800931+00:00",
+          "latency_ms": 2751.1471999969217,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 306,
+          "output_token_count": 131,
+          "total_token_count": 437,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "gemini-real-20261113:SYN-AUTH-POS-001",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "gemini",
+          "primary_model": "gemini-3.5-flash-lite",
+          "final_provider": "gemini",
+          "final_model": "gemini-3.5-flash-lite"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-AUTH-NEG-002",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Sign-in with empty email address\",\"description\":\"Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Submit the sign-in form with an empty email address.\",\"expected_result\":\"The submission is rejected and displays the message Email is required.\"}],\"expected_result\":\"The form submission is rejected with the message Email is required.\",\"evidence_chunk_ids\":[71011],\"requirement_keys\":[\"SYN-AUTH-2\"]}]}",
+      "overall_latency_ms": 1132.2763999996823,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.8888888888888888,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 0.6666666666666666,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-AUTH-2"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [
+            "negative"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.9523809523809524,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.6666666666666666,
+            "requested_category_quality": 1.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "request_timestamp": "2026-11-13T11:52:45.800931+00:00",
+          "completion_timestamp": "2026-11-13T11:52:46.934990+00:00",
+          "latency_ms": 1132.1480999977211,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 304,
+          "output_token_count": 136,
+          "total_token_count": 440,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "gemini-real-20261113:SYN-AUTH-NEG-002",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "gemini",
+          "primary_model": "gemini-3.5-flash-lite",
+          "final_provider": "gemini",
+          "final_model": "gemini-3.5-flash-lite"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-CART-BOUNDARY-003",
+      "status": "completed",
+      "raw_output": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Checkout with six item lines exceeds upper limit\",\n      \"description\": \"Verify that an order containing more than five item lines is rejected before payment.\",\n      \"test_type\": \"functional\",\n      \"category\": \"boundary\",\n      \"priority\": \"high\",\n      \"severity\": \"high\",\n      \"preconditions\": \"User has items in the cart.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to checkout an order containing six item lines.\",\n          \"expected_result\": \"The order is rejected before payment.\"\n        }\n      ],\n      \"expected_result\": \"Order with six item lines is rejected before payment.\",\n      \"evidence_chunk_ids\": [\n        71021\n      ],\n      \"requirement_keys\": [\n        \"SYN-CART-1\"\n      ]\n    },\n    {\n      \"title\": \"Checkout with zero item lines is below lower limit\",\n      \"description\": \"Verify that an order containing fewer than one item line (zero item lines) is rejected before payment.\",\n      \"test_type\": \"functional\",\n      \"category\": \"boundary\",\n      \"priority\": \"medium\",\n      \"severity\": \"medium\",\n      \"preconditions\": \"User has an empty cart.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to checkout an order containing zero item lines.\",\n          \"expected_result\": \"The order is rejected before payment.\"\n        }\n      ],\n      \"expected_result\": \"Order with zero item lines is rejected before payment.\",\n      \"evidence_chunk_ids\": [\n        71021\n      ],\n      \"requirement_keys\": [\n        \"SYN-CART-1\"\n      ]\n    }\n  ]\n}",
+      "overall_latency_ms": 1709.7225999968941,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.6721132897603486,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 0.5,
+          "cited_text_token_overlap_heuristic": 0.5163398692810457,
+          "valid_citation_count": 2,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-CART-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 0.5,
+          "covered": [
+            "boundary"
+          ],
+          "missing": [
+            "negative"
+          ],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.8951914098972923,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.5163398692810457,
+            "requested_category_quality": 0.75,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 2
+      },
+      "attempts": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "request_timestamp": "2026-11-13T11:52:46.934990+00:00",
+          "completion_timestamp": "2026-11-13T11:52:48.642621+00:00",
+          "latency_ms": 1709.6043999990798,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 352,
+          "output_token_count": 407,
+          "total_token_count": 759,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "gemini-real-20261113:SYN-CART-BOUNDARY-003",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "gemini",
+          "primary_model": "gemini-3.5-flash-lite",
+          "final_provider": "gemini",
+          "final_model": "gemini-3.5-flash-lite"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-RESET-EDGE-004",
+      "status": "completed",
+      "raw_output": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Password reset code rejection after expiration\",\n      \"description\": \"Verify that a password reset code is rejected when used after fifteen minutes from issuance.\",\n      \"test_type\": \"functional\",\n      \"category\": \"positive\",\n      \"priority\": \"medium\",\n      \"severity\": \"medium\",\n      \"preconditions\": \"A password reset code has been issued and more than fifteen minutes have elapsed.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to use the expired password reset code.\",\n          \"expected_result\": \"The password reset code is rejected.\"\n        }\n      ],\n      \"expected_result\": \"The code used after expiration is rejected.\",\n      \"evidence_chunk_ids\": [\n        71031\n      ],\n      \"requirement_keys\": [\n        \"SYN-RESET-1\"\n      ]\n    }\n  ]\n}",
+      "overall_latency_ms": 1311.1294000045746,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.6666666666666666,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 0.5,
+          "cited_text_token_overlap_heuristic": 0.5,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-RESET-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 0.0,
+          "covered": [],
+          "missing": [
+            "edge"
+          ],
+          "unexpected": [
+            "positive"
+          ]
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.7857142857142857,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.5,
+            "requested_category_quality": 0.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "request_timestamp": "2026-11-13T11:52:48.642621+00:00",
+          "completion_timestamp": "2026-11-13T11:52:49.958424+00:00",
+          "latency_ms": 1311.0075000004144,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 344,
+          "output_token_count": 212,
+          "total_token_count": 556,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "gemini-real-20261113:SYN-RESET-EDGE-004",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "gemini",
+          "primary_model": "gemini-3.5-flash-lite",
+          "final_provider": "gemini",
+          "final_model": "gemini-3.5-flash-lite"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[]}",
+      "overall_latency_ms": 993.7464999966323,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 1.0,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 1.0,
+          "valid_citation_count": 0,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": null,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "requested_category_coverage": 1.0
+          },
+          "human_review_required": false,
+          "human_review_scores": null
+        },
+        "generated_case_count": 0
+      },
+      "attempts": [
+        {
+          "provider": "gemini",
+          "model": "gemini-3.5-flash-lite",
+          "request_timestamp": "2026-11-13T11:52:49.958424+00:00",
+          "completion_timestamp": "2026-11-13T11:52:50.951851+00:00",
+          "latency_ms": 993.5977999994066,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 296,
+          "output_token_count": 6,
+          "total_token_count": 302,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "gemini-real-20261113:SYN-EXPORT-INSUFFICIENT-005",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "gemini",
+          "primary_model": "gemini-3.5-flash-lite",
+          "final_provider": "gemini",
+          "final_model": "gemini-3.5-flash-lite"
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "example_count": 5,
+    "completed_examples": 5,
+    "failed_examples": 0,
+    "skipped_examples": 0,
+    "successful_examples": 5,
+    "failed_call_count": 0,
+    "structured_output_validity_rate": 1.0,
+    "json_schema_validity_rate": 1.0,
+    "evidence_accuracy_score": 0.818082788671024,
+    "unsupported_claim_rate": 0.0,
+    "requirement_coverage": 1.0,
+    "test_case_usefulness_score": 0.8936157796451913,
+    "human_reviewed_usefulness_score": null,
+    "latency_ms": {
+      "count": 5,
+      "average": 1579.5009999987087,
+      "median": 1311.0075000004144,
+      "measurement": "live_provider_attempts"
+    },
+    "request_latency_ms": {
+      "count": 5,
+      "average": 1579.6361999993678,
+      "median": 1311.1294000045746,
+      "measurement": "live_end_to_end_request"
+    },
+    "input_tokens": {
+      "total": 1602,
+      "coverage": 1.0
+    },
+    "output_tokens": {
+      "total": 892,
+      "coverage": 1.0
+    },
+    "total_tokens": {
+      "total": 2494,
+      "coverage": 1.0
+    },
+    "estimated_cost": {
+      "total": null,
+      "currency": null,
+      "coverage": 0.0,
+      "is_estimate": null,
+      "measurement": "configured_estimate"
+    },
+    "telemetry_attempt_count": 5
+  },
+  "limitations": [
+    "Evidence and unsupported-claim checks are deterministic lexical/reference checks, not semantic proof.",
+    "Usefulness score is a deterministic proxy; human review is required for subjective quality.",
+    "Metrics from mocked services are not model performance measurements.",
+    "Telemetry and benchmark results are local files and in-memory during the run, not database-persisted."
+  ]
+}

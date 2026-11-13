@@ -65,20 +65,20 @@ class KnowledgeAgent(BaseAgent):
                 evidence=results,
             )
 
-        except ValueError:
+        except ValueError as exc:
             return AgentResult(
                 agent_name=self.name,
                 status="failed",
                 error={
                     "code": "RETRIEVAL_FAILED",
-                    "message": "The project or selected documents could not be accessed."
+                    "message": str(exc) or "The project or selected documents could not be accessed."
                 })
 
-        except Exception:
+        except Exception as exc:
             return AgentResult(
                 agent_name=self.name,
                 status="failed",
                 error={
                     "code": "KNOWLEDGE_SEARCH_FAILED",
-                    "message": "Knowledge retrieval failed unexpectedly."
+                    "message": str(exc) or "Knowledge retrieval failed unexpectedly."
                 })

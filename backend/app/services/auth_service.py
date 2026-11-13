@@ -1,8 +1,12 @@
-﻿from sqlalchemy.orm import Session
+﻿import logging
+
+from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.schemas.user_schema import UserCreate, UserLogin, UserResponse
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -12,7 +16,7 @@ class AuthService:
     def register_user(self, data: UserCreate) -> dict[str, object]:
         existing_user = self.db.query(User).filter(User.email == data.email).first()
         if existing_user:
-            raise ValueError("This e-mail is already registered")
+            raise ValueError("Unable to register with the provided details")
 
         try:
             user = User(
@@ -31,6 +35,11 @@ class AuthService:
             self.db.commit()
             self.db.refresh(user)
             self.db.refresh(organization)
+            logger.info(
+                "User registration completed: user_id=%s organization_id=%s",
+                user.id,
+                organization.id,
+            )
         except Exception:
             self.db.rollback()
             raise
@@ -50,10 +59,19 @@ class AuthService:
 
     def login_user(self, data: UserLogin) -> dict[str, object]:
         user = self.db.query(User).filter(User.email == data.email).first()
-        if not user or not verify_password(data.password, user.password_hash):
+        if user is None:
+            hash_password(data.password)
+            logger.warning("Authentication failed: reason=invalid_credentials")
+            raise ValueError("Invalid credentials")
+        if not verify_password(data.password, user.password_hash):
+            logger.warning("Authentication failed: reason=invalid_credentials")
+            raise ValueError("Invalid credentials")
+        if getattr(user, "is_active", True) is False:
+            logger.warning("Authentication failed: reason=invalid_credentials")
             raise ValueError("Invalid credentials")
 
         token = create_access_token({"user_id": user.id})
+        logger.info("Authentication succeeded: user_id=%s", user.id)
         return {
             "access_token": token,
             "token_type": "bearer",

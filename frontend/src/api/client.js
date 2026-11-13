@@ -1,5 +1,9 @@
 import axios from 'axios'
 
+import { getApiErrorMessage, handleUnauthorizedResponse } from './errorMessage'
+
+export { getApiErrorMessage }
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export const apiClient = axios.create({
@@ -8,11 +12,6 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 })
-
-export function getApiErrorMessage(error, fallback) {
-  const response = error?.response?.data
-  return response?.detail || response?.message || response?.errors?.[0]?.detail || fallback
-}
 
 // Attach the JWT token to every request if present.
 apiClient.interceptors.request.use((config) => {
@@ -27,10 +26,7 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      window.dispatchEvent(new Event('testnova:unauthorized'))
-    }
+    handleUnauthorizedResponse(error)
     return Promise.reject(error)
   },
 )

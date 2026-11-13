@@ -125,17 +125,17 @@ Rules:
                 evidence=[],
             )
 
-        except ValueError:
+        except ValueError as exc:
             return AgentResult(
                 agent_name=self.name,
                 status="failed",
                 error={
                     "code": "PROJECT_ACCESS_ERROR",
-                    "message": "Project could not be accessed.",
+                    "message": str(exc) or "Project could not be accessed.",
                 },
             )
 
-        except Exception:
+        except Exception as exc:
             logger.exception("Quality Insight Agent failed")
 
             return AgentResult(
@@ -143,6 +143,6 @@ Rules:
                 status="failed",
                 error={
                     "code": "QUALITY_INSIGHT_FAILED",
-                    "message": "Quality insight analysis failed.",
+                    "message": str(exc) or "Quality insight analysis failed.",
                 },
             )

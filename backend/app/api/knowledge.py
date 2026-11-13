@@ -5,6 +5,7 @@ from app.agents.contracts import AgentContext
 from app.agents.knowledge_agent import KnowledgeAgent
 from app.agents.orchestrator import Orchestrator
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 
 
@@ -18,7 +19,10 @@ class KnowledgeSearchRequest(BaseModel):
     source_types: list[str] | None = None
 
 
-@router.post("/{project_id}/knowledge/search")
+@router.post(
+    "/{project_id}/knowledge/search",
+    dependencies=[Depends(limit_requests("knowledge-agent-search", limit=20, window_seconds=60))],
+)
 def search_knowledge(project_id:int,request:KnowledgeSearchRequest,current_user:CurrentUser,db:Session=Depends(get_db)):
     orchestrator = Orchestrator()
     orchestrator.register("knowledge_search", KnowledgeAgent(db))

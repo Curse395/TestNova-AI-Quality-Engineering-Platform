@@ -110,11 +110,163 @@ def test_generation_run_migration_is_safe_when_column_already_exists():
         assert "ix_test_cases_generation_run_id" in indexes
 
 
+def test_workflow_hardening_migration_is_idempotent():
+    engine = sa.create_engine("sqlite://")
+    migration = load_migration("20261110_01_workflow_hardening.py")
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE workflow_runs (id INTEGER PRIMARY KEY, "
+            "project_id INTEGER, initiated_by INTEGER, workflow_type TEXT, "
+            "status TEXT, input_data TEXT, final_output TEXT, "
+            "error_summary TEXT, created_at TEXT, started_at TEXT, "
+            "completed_at TEXT, updated_at TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE workflow_tasks (id INTEGER PRIMARY KEY, "
+            "workflow_run_id INTEGER, agent_name TEXT, task_type TEXT, "
+            "status TEXT, depends_on_task_ids TEXT, input_data TEXT, "
+            "output_data TEXT, attempt_count INTEGER, error_details TEXT, "
+            "started_at TEXT, completed_at TEXT, created_at TEXT, "
+            "updated_at TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE workflow_task_attempts (id INTEGER PRIMARY KEY, "
+            "workflow_task_id INTEGER, attempt_number INTEGER, status TEXT, "
+            "output_data TEXT, error_details TEXT, started_at TEXT, "
+            "completed_at TEXT, created_at TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE test_case_generation_runs (id INTEGER PRIMARY KEY, "
+            "workflow_run_id INTEGER, workflow_attempt_number INTEGER)"
+        )
+
+        run_migration(connection, migration, "upgrade")
+        run_migration(connection, migration, "upgrade")
+
+        workflow_run_columns = {
+            column["name"]
+            for column in sa.inspect(connection).get_columns("workflow_runs")
+        }
+        unique_constraints = {
+            constraint["name"]
+            for constraint in sa.inspect(connection).get_unique_constraints(
+                "workflow_task_attempts"
+            )
+        }
+        check_constraints = {
+            constraint["name"]
+            for constraint in sa.inspect(connection).get_check_constraints(
+                "workflow_task_attempts"
+            )
+        }
+
+        assert "generation_attempt_count" in workflow_run_columns
+        assert "uq_workflow_task_attempt_number" in unique_constraints
+        assert "ck_workflow_task_attempt_status" in check_constraints
+
+
+def test_workflow_hardening_migration_rejects_duplicate_keys():
+    engine = sa.create_engine("sqlite://")
+    migration = load_migration("20261110_01_workflow_hardening.py")
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE workflow_runs (id INTEGER PRIMARY KEY, "
+            "project_id INTEGER, initiated_by INTEGER, workflow_type TEXT, "
+            "status TEXT, input_data TEXT, final_output TEXT, "
+            "error_summary TEXT, created_at TEXT, started_at TEXT, "
+            "completed_at TEXT, updated_at TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE workflow_task_attempts (id INTEGER PRIMARY KEY, "
+            "workflow_task_id INTEGER, attempt_number INTEGER, status TEXT, "
+            "output_data TEXT, error_details TEXT, started_at TEXT, "
+            "completed_at TEXT, created_at TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE test_case_generation_runs (id INTEGER PRIMARY KEY, "
+            "workflow_run_id INTEGER, workflow_attempt_number INTEGER)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO workflow_task_attempts "
+            "(workflow_task_id, attempt_number, status, started_at, created_at) "
+            "VALUES (1, 1, 'running', '2026-01-01', '2026-01-01'), "
+            "(1, 1, 'failed', '2026-01-02', '2026-01-02')"
+        )
+
+        with pytest.raises(RuntimeError, match="duplicate key found"):
+            run_migration(connection, migration, "upgrade")
+
+
 def test_forward_only_migrations_refuse_to_drop_columns():
     for filename in (
         "20261104_01_document_processing_state.py",
         "20261106_02_test_case_generation_run_link.py",
+        "20261110_02_test_type_dimension.py",
+        "20261111_01_phase4_traceability.py",
     ):
         migration = load_migration(filename)
         with pytest.raises(RuntimeError, match="forward-only"):
             migration.downgrade()
+
+
+def test_test_type_migration_is_additive_and_idempotent():
+    engine = sa.create_engine("sqlite://")
+    migration = load_migration("20261110_02_test_type_dimension.py")
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE test_cases (id INTEGER PRIMARY KEY)"
+        )
+        run_migration(connection, migration, "upgrade")
+        run_migration(connection, migration, "upgrade")
+
+        column = next(
+            column
+            for column in sa.inspect(connection).get_columns("test_cases")
+            if column["name"] == "test_type"
+        )
+        assert column["nullable"] is True
+        assert isinstance(column["type"], sa.String)
+        assert column["type"].length == 60
+
+
+def test_phase4_traceability_migration_adds_accounting_and_severity_check():
+    engine = sa.create_engine("sqlite://")
+    migration = load_migration("20261111_01_phase4_traceability.py")
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE test_cases (id INTEGER PRIMARY KEY, severity TEXT)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE test_case_generation_runs ("
+            "id INTEGER PRIMARY KEY, generated_case_count INTEGER NOT NULL DEFAULT 0)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE projects (id INTEGER PRIMARY KEY)"
+        )
+        run_migration(connection, migration, "upgrade")
+        run_migration(connection, migration, "upgrade")
+
+        inspector = sa.inspect(connection)
+        run_columns = {
+            column["name"]
+            for column in inspector.get_columns("test_case_generation_runs")
+        }
+        case_checks = {
+            item["name"] for item in inspector.get_check_constraints("test_cases")
+        }
+        assert {
+            "requirement_keys",
+            "duplicate_rejected_count",
+            "invalid_rejected_count",
+            "insufficient_evidence_count",
+            "final_persisted_count",
+            "retry_count",
+        } <= run_columns
+        assert "ck_test_cases_severity" in case_checks
+        assert {"project_requirements", "test_case_requirements"} <= set(
+            inspector.get_table_names()
+        )

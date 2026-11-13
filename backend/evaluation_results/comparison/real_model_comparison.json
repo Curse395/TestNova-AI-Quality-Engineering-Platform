@@ -1,0 +1,563 @@
+{
+  "comparison_schema_version": "1.0.0",
+  "dataset_versions": [
+    "TestNova synthetic evidence-grounded test-case generation@1.0.0"
+  ],
+  "runs": [
+    {
+      "benchmark_run_id": "gemini-real-20261113",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "execution_mode": "live",
+      "dataset_version": "1.0.0",
+      "metrics": {
+        "example_count": 5,
+        "completed_examples": 5,
+        "failed_examples": 0,
+        "skipped_examples": 0,
+        "successful_examples": 5,
+        "failed_call_count": 0,
+        "structured_output_validity_rate": 1.0,
+        "json_schema_validity_rate": 1.0,
+        "evidence_accuracy_score": 0.818082788671024,
+        "unsupported_claim_rate": 0.0,
+        "requirement_coverage": 1.0,
+        "test_case_usefulness_score": 0.8936157796451913,
+        "human_reviewed_usefulness_score": null,
+        "latency_ms": {
+          "count": 5,
+          "average": 1579.5009999987087,
+          "median": 1311.0075000004144,
+          "measurement": "live_provider_attempts"
+        },
+        "request_latency_ms": {
+          "count": 5,
+          "average": 1579.6361999993678,
+          "median": 1311.1294000045746,
+          "measurement": "live_end_to_end_request"
+        },
+        "input_tokens": {
+          "total": 1602,
+          "coverage": 1.0
+        },
+        "output_tokens": {
+          "total": 892,
+          "coverage": 1.0
+        },
+        "total_tokens": {
+          "total": 2494,
+          "coverage": 1.0
+        },
+        "estimated_cost": {
+          "total": null,
+          "currency": null,
+          "coverage": 0.0,
+          "is_estimate": null,
+          "measurement": "configured_estimate"
+        },
+        "telemetry_attempt_count": 5
+      }
+    },
+    {
+      "benchmark_run_id": "groq-real-20261113",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "execution_mode": "live",
+      "dataset_version": "1.0.0",
+      "metrics": {
+        "example_count": 5,
+        "completed_examples": 5,
+        "failed_examples": 0,
+        "skipped_examples": 0,
+        "successful_examples": 5,
+        "failed_call_count": 0,
+        "structured_output_validity_rate": 1.0,
+        "json_schema_validity_rate": 1.0,
+        "evidence_accuracy_score": 0.6925733686603253,
+        "unsupported_claim_rate": 0.0,
+        "requirement_coverage": 1.0,
+        "test_case_usefulness_score": 0.8539600151401393,
+        "human_reviewed_usefulness_score": null,
+        "latency_ms": {
+          "count": 5,
+          "average": 1229.660819999117,
+          "median": 1349.7673999954714,
+          "measurement": "live_provider_attempts"
+        },
+        "request_latency_ms": {
+          "count": 5,
+          "average": 1229.7859600002994,
+          "median": 1349.8856000005617,
+          "measurement": "live_end_to_end_request"
+        },
+        "input_tokens": {
+          "total": 1981,
+          "coverage": 1.0
+        },
+        "output_tokens": {
+          "total": 3177,
+          "coverage": 1.0
+        },
+        "total_tokens": {
+          "total": 5158,
+          "coverage": 1.0
+        },
+        "estimated_cost": {
+          "total": null,
+          "currency": null,
+          "coverage": 0.0,
+          "is_estimate": null,
+          "measurement": "configured_estimate"
+        },
+        "telemetry_attempt_count": 5
+      }
+    }
+  ],
+  "winner": null,
+  "interpretation": "No winner is declared automatically. Ensure runs use the same dataset version and compare only adequately covered, non-mocked measurements.",
+  "human_review_samples": [
+    {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "example_id": "SYN-AUTH-POS-001",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Registered user successfully signs in with correct credentials\",\"description\":\"Verify that a registered user submitting the correct email address and password is signed in and redirected to the project dashboard.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"User is registered\",\"steps\":[{\"action\":\"Submit correct email address and password\",\"expected_result\":\"User is signed in and taken to the project dashboard\"}],\"expected_result\":\"User is signed in and taken to the project dashboard\",\"evidence_chunk_ids\":[71001],\"requirement_keys\":[\"SYN-AUTH-1\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "Registered user successfully signs in with correct credentials",
+          "description": "Verify that a registered user submitting the correct email address and password is signed in and redirected to the project dashboard.",
+          "test_type": "functional",
+          "category": "positive",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "User is registered",
+          "steps": [
+            {
+              "action": "Submit correct email address and password",
+              "expected_result": "User is signed in and taken to the project dashboard"
+            }
+          ],
+          "expected_result": "User is signed in and taken to the project dashboard",
+          "evidence_chunk_ids": [
+            71001
+          ],
+          "requirement_keys": [
+            "SYN-AUTH-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "example_id": "SYN-AUTH-NEG-002",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Sign-in with empty email address\",\"description\":\"Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Submit the sign-in form with an empty email address.\",\"expected_result\":\"The submission is rejected and displays the message Email is required.\"}],\"expected_result\":\"The form submission is rejected with the message Email is required.\",\"evidence_chunk_ids\":[71011],\"requirement_keys\":[\"SYN-AUTH-2\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "Sign-in with empty email address",
+          "description": "Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.",
+          "test_type": "functional",
+          "category": "negative",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Submit the sign-in form with an empty email address.",
+              "expected_result": "The submission is rejected and displays the message Email is required."
+            }
+          ],
+          "expected_result": "The form submission is rejected with the message Email is required.",
+          "evidence_chunk_ids": [
+            71011
+          ],
+          "requirement_keys": [
+            "SYN-AUTH-2"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "example_id": "SYN-CART-BOUNDARY-003",
+      "status": "completed",
+      "raw_output": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Checkout with six item lines exceeds upper limit\",\n      \"description\": \"Verify that an order containing more than five item lines is rejected before payment.\",\n      \"test_type\": \"functional\",\n      \"category\": \"boundary\",\n      \"priority\": \"high\",\n      \"severity\": \"high\",\n      \"preconditions\": \"User has items in the cart.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to checkout an order containing six item lines.\",\n          \"expected_result\": \"The order is rejected before payment.\"\n        }\n      ],\n      \"expected_result\": \"Order with six item lines is rejected before payment.\",\n      \"evidence_chunk_ids\": [\n        71021\n      ],\n      \"requirement_keys\": [\n        \"SYN-CART-1\"\n      ]\n    },\n    {\n      \"title\": \"Checkout with zero item lines is below lower limit\",\n      \"description\": \"Verify that an order containing fewer than one item line (zero item lines) is rejected before payment.\",\n      \"test_type\": \"functional\",\n      \"category\": \"boundary\",\n      \"priority\": \"medium\",\n      \"severity\": \"medium\",\n      \"preconditions\": \"User has an empty cart.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to checkout an order containing zero item lines.\",\n          \"expected_result\": \"The order is rejected before payment.\"\n        }\n      ],\n      \"expected_result\": \"Order with zero item lines is rejected before payment.\",\n      \"evidence_chunk_ids\": [\n        71021\n      ],\n      \"requirement_keys\": [\n        \"SYN-CART-1\"\n      ]\n    }\n  ]\n}",
+      "parsed_test_cases": [
+        {
+          "title": "Checkout with six item lines exceeds upper limit",
+          "description": "Verify that an order containing more than five item lines is rejected before payment.",
+          "test_type": "functional",
+          "category": "boundary",
+          "priority": "high",
+          "severity": "high",
+          "preconditions": "User has items in the cart.",
+          "steps": [
+            {
+              "action": "Attempt to checkout an order containing six item lines.",
+              "expected_result": "The order is rejected before payment."
+            }
+          ],
+          "expected_result": "Order with six item lines is rejected before payment.",
+          "evidence_chunk_ids": [
+            71021
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        },
+        {
+          "title": "Checkout with zero item lines is below lower limit",
+          "description": "Verify that an order containing fewer than one item line (zero item lines) is rejected before payment.",
+          "test_type": "functional",
+          "category": "boundary",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "User has an empty cart.",
+          "steps": [
+            {
+              "action": "Attempt to checkout an order containing zero item lines.",
+              "expected_result": "The order is rejected before payment."
+            }
+          ],
+          "expected_result": "Order with zero item lines is rejected before payment.",
+          "evidence_chunk_ids": [
+            71021
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "example_id": "SYN-RESET-EDGE-004",
+      "status": "completed",
+      "raw_output": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Password reset code rejection after expiration\",\n      \"description\": \"Verify that a password reset code is rejected when used after fifteen minutes from issuance.\",\n      \"test_type\": \"functional\",\n      \"category\": \"positive\",\n      \"priority\": \"medium\",\n      \"severity\": \"medium\",\n      \"preconditions\": \"A password reset code has been issued and more than fifteen minutes have elapsed.\",\n      \"steps\": [\n        {\n          \"action\": \"Attempt to use the expired password reset code.\",\n          \"expected_result\": \"The password reset code is rejected.\"\n        }\n      ],\n      \"expected_result\": \"The code used after expiration is rejected.\",\n      \"evidence_chunk_ids\": [\n        71031\n      ],\n      \"requirement_keys\": [\n        \"SYN-RESET-1\"\n      ]\n    }\n  ]\n}",
+      "parsed_test_cases": [
+        {
+          "title": "Password reset code rejection after expiration",
+          "description": "Verify that a password reset code is rejected when used after fifteen minutes from issuance.",
+          "test_type": "functional",
+          "category": "positive",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "A password reset code has been issued and more than fifteen minutes have elapsed.",
+          "steps": [
+            {
+              "action": "Attempt to use the expired password reset code.",
+              "expected_result": "The password reset code is rejected."
+            }
+          ],
+          "expected_result": "The code used after expiration is rejected.",
+          "evidence_chunk_ids": [
+            71031
+          ],
+          "requirement_keys": [
+            "SYN-RESET-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[]}",
+      "parsed_test_cases": [],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "example_id": "SYN-AUTH-POS-001",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-AUTH-POS-001: Successful login with correct credentials\",\"description\":\"Verify that a registered user can sign in using a valid email address and password and is redirected to the project dashboard.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"A user account exists with email 'user@example.com' and password 'Password123'.\",\"steps\":[{\"action\":\"Navigate to the login page\",\"expected_result\":\"Login page is displayed\"},{\"action\":\"Enter email 'user@example.com'\",\"expected_result\":\"Email field accepts input\"},{\"action\":\"Enter password 'Password123'\",\"expected_result\":\"Password field accepts input\"},{\"action\":\"Click the 'Sign In' button\",\"expected_result\":\"User is authenticated and redirected to the project dashboard\"}],\"expected_result\":\"User is signed in and taken to the project dashboard\",\"evidence_chunk_ids\":[71001],\"requirement_keys\":[\"SYN-AUTH-1\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "SYN-AUTH-POS-001: Successful login with correct credentials",
+          "description": "Verify that a registered user can sign in using a valid email address and password and is redirected to the project dashboard.",
+          "test_type": "functional",
+          "category": "positive",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "A user account exists with email 'user@example.com' and password 'Password123'.",
+          "steps": [
+            {
+              "action": "Navigate to the login page",
+              "expected_result": "Login page is displayed"
+            },
+            {
+              "action": "Enter email 'user@example.com'",
+              "expected_result": "Email field accepts input"
+            },
+            {
+              "action": "Enter password 'Password123'",
+              "expected_result": "Password field accepts input"
+            },
+            {
+              "action": "Click the 'Sign In' button",
+              "expected_result": "User is authenticated and redirected to the project dashboard"
+            }
+          ],
+          "expected_result": "User is signed in and taken to the project dashboard",
+          "evidence_chunk_ids": [
+            71001
+          ],
+          "requirement_keys": [
+            "SYN-AUTH-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "example_id": "SYN-AUTH-NEG-002",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-AUTH-2: Empty Email Address Rejection\",\"description\":\"Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Enter an empty string into the email address field and click the submit button\",\"expected_result\":\"The form submission is rejected and the message \\\"Email is required.\\\" is displayed\"}],\"expected_result\":\"The form submission is rejected and the message \\\"Email is required.\\\" is displayed\",\"evidence_chunk_ids\":[71011],\"requirement_keys\":[\"SYN-AUTH-2\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "SYN-AUTH-2: Empty Email Address Rejection",
+          "description": "Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.",
+          "test_type": "functional",
+          "category": "negative",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Enter an empty string into the email address field and click the submit button",
+              "expected_result": "The form submission is rejected and the message \"Email is required.\" is displayed"
+            }
+          ],
+          "expected_result": "The form submission is rejected and the message \"Email is required.\" is displayed",
+          "evidence_chunk_ids": [
+            71011
+          ],
+          "requirement_keys": [
+            "SYN-AUTH-2"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "example_id": "SYN-CART-BOUNDARY-003",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-CART-BOUNDARY-001: Checkout with minimum item lines (1)\",\"description\":\"Verify checkout accepts an order containing exactly one item line.\",\"test_type\":\"functional\",\"category\":\"boundary\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 1 item line to the cart\",\"expected_result\":\"Checkout proceeds to payment\"}],\"expected_result\":\"Checkout proceeds to payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-BOUNDARY-002: Checkout with maximum item lines (5)\",\"description\":\"Verify checkout accepts an order containing exactly five item lines.\",\"test_type\":\"functional\",\"category\":\"boundary\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 5 item lines to the cart\",\"expected_result\":\"Checkout proceeds to payment\"}],\"expected_result\":\"Checkout proceeds to payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-NEGATIVE-001: Checkout with zero item lines\",\"description\":\"Verify checkout rejects an order with no item lines before payment.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Attempt to checkout with an empty cart\",\"expected_result\":\"Checkout is rejected before payment\"}],\"expected_result\":\"Checkout is rejected before payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-NEGATIVE-002: Checkout with more than maximum item lines (6)\",\"description\":\"Verify checkout rejects an order containing more than five item lines before payment.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 6 item lines to the cart\",\"expected_result\":\"Checkout is rejected before payment\"}],\"expected_result\":\"Checkout is rejected before payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "SYN-CART-BOUNDARY-001: Checkout with minimum item lines (1)",
+          "description": "Verify checkout accepts an order containing exactly one item line.",
+          "test_type": "functional",
+          "category": "boundary",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Add 1 item line to the cart",
+              "expected_result": "Checkout proceeds to payment"
+            }
+          ],
+          "expected_result": "Checkout proceeds to payment",
+          "evidence_chunk_ids": [
+            71021,
+            71022
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        },
+        {
+          "title": "SYN-CART-BOUNDARY-002: Checkout with maximum item lines (5)",
+          "description": "Verify checkout accepts an order containing exactly five item lines.",
+          "test_type": "functional",
+          "category": "boundary",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Add 5 item lines to the cart",
+              "expected_result": "Checkout proceeds to payment"
+            }
+          ],
+          "expected_result": "Checkout proceeds to payment",
+          "evidence_chunk_ids": [
+            71021,
+            71022
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        },
+        {
+          "title": "SYN-CART-NEGATIVE-001: Checkout with zero item lines",
+          "description": "Verify checkout rejects an order with no item lines before payment.",
+          "test_type": "functional",
+          "category": "negative",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Attempt to checkout with an empty cart",
+              "expected_result": "Checkout is rejected before payment"
+            }
+          ],
+          "expected_result": "Checkout is rejected before payment",
+          "evidence_chunk_ids": [
+            71021,
+            71022
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        },
+        {
+          "title": "SYN-CART-NEGATIVE-002: Checkout with more than maximum item lines (6)",
+          "description": "Verify checkout rejects an order containing more than five item lines before payment.",
+          "test_type": "functional",
+          "category": "negative",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Add 6 item lines to the cart",
+              "expected_result": "Checkout is rejected before payment"
+            }
+          ],
+          "expected_result": "Checkout is rejected before payment",
+          "evidence_chunk_ids": [
+            71021,
+            71022
+          ],
+          "requirement_keys": [
+            "SYN-CART-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "example_id": "SYN-RESET-EDGE-004",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Password reset code accepted within 15 minutes\",\"description\":\"Verify that a password reset code is accepted when used before the 15-minute expiry period.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Issue a password reset code to the user\",\"expected_result\":\"Reset code is generated and sent to the user\"},{\"action\":\"Wait 10 minutes\",\"expected_result\":\"Time elapsed is less than 15 minutes\"},{\"action\":\"Submit the reset code to the password reset endpoint\",\"expected_result\":\"Password reset is successful and user is prompted to set a new password\"}],\"expected_result\":\"Password reset succeeds within the 15-minute window\",\"evidence_chunk_ids\":[71031],\"requirement_keys\":[\"SYN-RESET-1\"]},{\"title\":\"Password reset code rejected after 15 minutes\",\"description\":\"Verify that a password reset code is rejected when used after the 15-minute expiry period.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Issue a password reset code to the user\",\"expected_result\":\"Reset code is generated and sent to the user\"},{\"action\":\"Wait 16 minutes\",\"expected_result\":\"Time elapsed exceeds 15 minutes\"},{\"action\":\"Submit the reset code to the password reset endpoint\",\"expected_result\":\"Password reset is rejected with an error indicating the code has expired\"}],\"expected_result\":\"Password reset fails due to expired code\",\"evidence_chunk_ids\":[71031],\"requirement_keys\":[\"SYN-RESET-1\"]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "Password reset code accepted within 15 minutes",
+          "description": "Verify that a password reset code is accepted when used before the 15-minute expiry period.",
+          "test_type": "functional",
+          "category": "positive",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Issue a password reset code to the user",
+              "expected_result": "Reset code is generated and sent to the user"
+            },
+            {
+              "action": "Wait 10 minutes",
+              "expected_result": "Time elapsed is less than 15 minutes"
+            },
+            {
+              "action": "Submit the reset code to the password reset endpoint",
+              "expected_result": "Password reset is successful and user is prompted to set a new password"
+            }
+          ],
+          "expected_result": "Password reset succeeds within the 15-minute window",
+          "evidence_chunk_ids": [
+            71031
+          ],
+          "requirement_keys": [
+            "SYN-RESET-1"
+          ]
+        },
+        {
+          "title": "Password reset code rejected after 15 minutes",
+          "description": "Verify that a password reset code is rejected when used after the 15-minute expiry period.",
+          "test_type": "functional",
+          "category": "negative",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Issue a password reset code to the user",
+              "expected_result": "Reset code is generated and sent to the user"
+            },
+            {
+              "action": "Wait 16 minutes",
+              "expected_result": "Time elapsed exceeds 15 minutes"
+            },
+            {
+              "action": "Submit the reset code to the password reset endpoint",
+              "expected_result": "Password reset is rejected with an error indicating the code has expired"
+            }
+          ],
+          "expected_result": "Password reset fails due to expired code",
+          "evidence_chunk_ids": [
+            71031
+          ],
+          "requirement_keys": [
+            "SYN-RESET-1"
+          ]
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    },
+    {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Verify export feature availability\",\"description\":\"Ensure that the product provides an export feature as specified.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Navigate to the export functionality\",\"expected_result\":\"Export option is displayed and accessible\"}],\"expected_result\":\"Export feature is available for use\",\"evidence_chunk_ids\":[71041],\"requirement_keys\":[]}]}",
+      "parsed_test_cases": [
+        {
+          "title": "Verify export feature availability",
+          "description": "Ensure that the product provides an export feature as specified.",
+          "test_type": "functional",
+          "category": "positive",
+          "priority": "medium",
+          "severity": "medium",
+          "preconditions": "",
+          "steps": [
+            {
+              "action": "Navigate to the export functionality",
+              "expected_result": "Export option is displayed and accessible"
+            }
+          ],
+          "expected_result": "Export feature is available for use",
+          "evidence_chunk_ids": [
+            71041
+          ],
+          "requirement_keys": []
+        }
+      ],
+      "human_review_status": "not_reviewed"
+    }
+  ],
+  "metric_interpretation": [
+    "Latency and token counts are from actual live provider attempts; token counts were available for all 5/5 attempts per provider.",
+    "Evidence accuracy, unsupported-claim rate, requirement coverage, and usefulness are automated deterministic proxies; no human review has been completed.",
+    "Estimated cost is unavailable (pricing is not configured); null means unknown, not zero.",
+    "Five examples per provider are insufficient for a statistically robust model winner; no winner is declared."
+  ]
+}

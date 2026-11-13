@@ -81,6 +81,50 @@ export async function fetchProjectTestCases(projectId) {
   return data.data
 }
 
+export async function fetchProjectTestCase(projectId, testCaseId) {
+  const { data } = await apiClient.get(`/projects/${projectId}/test-cases/${testCaseId}`)
+  const testCase = data?.data ?? data
+  if (!testCase || typeof testCase !== 'object' || Array.isArray(testCase)) {
+    throw new Error('Unexpected test case response.')
+  }
+  return testCase
+}
+
+export async function updateProjectTestCase(projectId, testCaseId, changes) {
+  const { data } = await apiClient.patch(
+    `/projects/${projectId}/test-cases/${testCaseId}`,
+    changes,
+  )
+  const testCase = data?.data ?? data
+  if (!testCase || typeof testCase !== 'object' || Array.isArray(testCase)) {
+    throw new Error('Unexpected test case response.')
+  }
+  return testCase
+}
+
+export async function deleteProjectTestCase(projectId, testCaseId) {
+  const { data } = await apiClient.delete(`/projects/${projectId}/test-cases/${testCaseId}`)
+  return data?.data ?? data
+}
+
+export async function fetchProjectTestCaseGenerationRuns(projectId) {
+  const { data } = await apiClient.get(`/projects/${projectId}/test-case-generation-runs`)
+  if (!Array.isArray(data?.data)) {
+    throw new Error('Unexpected test case generation runs response.')
+  }
+  return data.data
+}
+
+export async function evaluateProjectTestCaseGenerationRun(projectId, runId) {
+  const { data } = await apiClient.post(
+    `/projects/${projectId}/test-case-generation-runs/${runId}/evaluate`,
+  )
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('Unexpected generation run evaluation response.')
+  }
+  return data
+}
+
 export async function deleteProjectDocument(documentId) {
   const { data } = await apiClient.delete(`/uploads/${documentId}`)
   return data.data

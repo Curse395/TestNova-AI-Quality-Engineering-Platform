@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException,Query
 from sqlalchemy.orm import Session
 from app.core.dependencies import CurrentUser
+from app.core.rate_limit import limit_requests
 from app.database.connection import get_db
 from app.schemas.test_execution_schema import APIExecutionRequest
 from app.services.test_execution_service import TestExecutionService
@@ -9,7 +10,10 @@ from app.services.test_execution_service import TestExecutionService
 router = APIRouter(prefix="/projects",tags=["Test Execution"])
 
 
-@router.post("/{project_id}/test-cases/{test_case_id}/execute-api")
+@router.post(
+    "/{project_id}/test-cases/{test_case_id}/execute-api",
+    dependencies=[Depends(limit_requests("test-execution", limit=10, window_seconds=60))],
+)
 def execute_api_test(
     project_id: int,
     test_case_id: int,
@@ -83,5 +87,4 @@ def get_execution_details(project_id:int,run_id:int,current_user:CurrentUser,db:
             raise HTTPException(status_code=404, detail=message) from exc
 
         raise HTTPException(status_code=400, detail=message) from exc
-
 

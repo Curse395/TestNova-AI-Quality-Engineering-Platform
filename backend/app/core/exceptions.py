@@ -21,13 +21,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             code = TestNovaErrorCodes.VALIDATION_ERROR
         elif exc.status_code == status.HTTP_403_FORBIDDEN:
             code = TestNovaErrorCodes.AUTHENTICATION_FAILED
+        elif exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            code = TestNovaErrorCodes.RATE_LIMITED
 
         payload = error_response(
             message=detail,
             data=None,
             errors=[ErrorDetail(code=code, field=None, detail=detail)],
         )
-        return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=payload.model_dump(),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(RequestValidationError)
     
@@ -44,6 +50,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             "Database operation failed: path=%s error_type=%s",
             request.url.path,
             type(exc).__name__,
+            extra={"error_type": type(exc).__name__},
         )
         payload = error_response(
             message="Database operation failed",
@@ -54,6 +61,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error(
+            "Unhandled request failure: path=%s error_type=%s",
+            request.url.path,
+            type(exc).__name__,
+            extra={"error_type": type(exc).__name__},
+        )
         payload = error_response(
             message="Internal server error",
             data=None,

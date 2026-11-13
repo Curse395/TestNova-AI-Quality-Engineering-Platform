@@ -1,0 +1,2104 @@
+{
+  "review_schema_version": "1.0.0",
+  "created_at": "2026-11-13T12:47:01.567105+00:00",
+  "review_provenance": "assistant_preliminary_not_human_review",
+  "dataset": {
+    "path": "../../evaluation_datasets/test_case_generation_v1.json",
+    "version": "1.0.0",
+    "synthetic": true
+  },
+  "automated_findings_and_human_ratings_are_separate": true,
+  "all_human_review_fields_pending": true,
+  "providers": [
+    {
+      "benchmark_run_id": "gemini-real-20261113",
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "dataset_version": "1.0.0",
+      "dataset_sha256": "cd0068d130f3bdb7130c1714ec973c51ccf0a5cc9cf971aeccc17be57c70c702",
+      "source_report": "../gemini-real-run/gemini-real-20261113.json",
+      "examples": [
+        {
+          "example_id": "SYN-AUTH-POS-001",
+          "status": "completed",
+          "raw_output_source": "../gemini-real-run/gemini-real-20261113.json",
+          "raw_output_sha256": "60e5643851d0f8a2b1e6449373d0da0d9cc2ed66f0b61d0de4583cab0ee34e36",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.8627450980392157,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 0.5882352941176471,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-AUTH-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [
+                "positive"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.9411764705882353,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.5882352941176471,
+                "requested_category_quality": 1.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "gemini:SYN-AUTH-POS-001:case-01",
+              "title": "Registered user successfully signs in with correct credentials",
+              "test_case": {
+                "title": "Registered user successfully signs in with correct credentials",
+                "description": "Verify that a registered user submitting the correct email address and password is signed in and redirected to the project dashboard.",
+                "test_type": "functional",
+                "category": "positive",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "User is registered",
+                "steps": [
+                  {
+                    "action": "Submit correct email address and password",
+                    "expected_result": "User is signed in and taken to the project dashboard"
+                  }
+                ],
+                "expected_result": "User is signed in and taken to the project dashboard",
+                "evidence_chunk_ids": [
+                  71001
+                ],
+                "requirement_keys": [
+                  "SYN-AUTH-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8627450980392157,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9411764705882353,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71001
+                  ],
+                  "preliminary_note": "The expected sign-in and dashboard outcome are in evidence 71001. The abbreviated action and precondition may need environment-specific setup."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-AUTH-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "supported",
+                  "note": "The expected sign-in and dashboard outcome are in evidence 71001. The abbreviated action and precondition may need environment-specific setup."
+                },
+                "action_clarity": {
+                  "status": "clear_but_high_level",
+                  "note": "The expected sign-in and dashboard outcome are in evidence 71001. The abbreviated action and precondition may need environment-specific setup."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "The expected sign-in and dashboard outcome are in evidence 71001. The abbreviated action and precondition may need environment-specific setup."
+                },
+                "unsupported_assumptions": [],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_with_setup",
+                  "note": "Useful core happy-path case; add executable account/test-data setup."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-AUTH-NEG-002",
+          "status": "completed",
+          "raw_output_source": "../gemini-real-run/gemini-real-20261113.json",
+          "raw_output_sha256": "a8b0bb5f35c1e13e055953027bf38cb94a36d7fc06acaae75fbfc3b5e546e574",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.8888888888888888,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 0.6666666666666666,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-AUTH-2"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [
+                "negative"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.9523809523809524,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.6666666666666666,
+                "requested_category_quality": 1.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "gemini:SYN-AUTH-NEG-002:case-01",
+              "title": "Sign-in with empty email address",
+              "test_case": {
+                "title": "Sign-in with empty email address",
+                "description": "Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.",
+                "test_type": "functional",
+                "category": "negative",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Submit the sign-in form with an empty email address.",
+                    "expected_result": "The submission is rejected and displays the message Email is required."
+                  }
+                ],
+                "expected_result": "The form submission is rejected with the message Email is required.",
+                "evidence_chunk_ids": [
+                  71011
+                ],
+                "requirement_keys": [
+                  "SYN-AUTH-2"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8888888888888888,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9523809523809524,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71011
+                  ],
+                  "preliminary_note": "The empty-email rejection and exact message are explicitly stated in evidence 71011."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-AUTH-2"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "supported",
+                  "note": "The empty-email rejection and exact message are explicitly stated in evidence 71011."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "The empty-email rejection and exact message are explicitly stated in evidence 71011."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "The empty-email rejection and exact message are explicitly stated in evidence 71011."
+                },
+                "unsupported_assumptions": [],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful",
+                  "note": "Useful, directly executable negative validation case."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-CART-BOUNDARY-003",
+          "status": "completed",
+          "raw_output_source": "../gemini-real-run/gemini-real-20261113.json",
+          "raw_output_sha256": "225aaa48faad9c575d1a339b608a05f4cc5ecd17b4c6f4d620e7a7bd8cf8ac03",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.6721132897603486,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 0.5,
+              "cited_text_token_overlap_heuristic": 0.5163398692810457,
+              "valid_citation_count": 2,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-CART-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 0.5,
+              "covered": [
+                "boundary"
+              ],
+              "missing": [
+                "negative"
+              ],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.8951914098972923,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.5163398692810457,
+                "requested_category_quality": 0.75,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 2
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "gemini:SYN-CART-BOUNDARY-003:case-01",
+              "title": "Checkout with six item lines exceeds upper limit",
+              "test_case": {
+                "title": "Checkout with six item lines exceeds upper limit",
+                "description": "Verify that an order containing more than five item lines is rejected before payment.",
+                "test_type": "functional",
+                "category": "boundary",
+                "priority": "high",
+                "severity": "high",
+                "preconditions": "User has items in the cart.",
+                "steps": [
+                  {
+                    "action": "Attempt to checkout an order containing six item lines.",
+                    "expected_result": "The order is rejected before payment."
+                  }
+                ],
+                "expected_result": "Order with six item lines is rejected before payment.",
+                "evidence_chunk_ids": [
+                  71021
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.6721132897603486,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.8951914098972923,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021
+                  ],
+                  "preliminary_note": "Six lines exceed the documented five-line maximum and rejection-before-payment behavior is explicit in 71021."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "supported",
+                  "note": "Six lines exceed the documented five-line maximum and rejection-before-payment behavior is explicit in 71021."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Six lines exceed the documented five-line maximum and rejection-before-payment behavior is explicit in 71021."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "Six lines exceed the documented five-line maximum and rejection-before-payment behavior is explicit in 71021."
+                },
+                "unsupported_assumptions": [],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful",
+                  "note": "Useful upper-limit rejection case."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            },
+            {
+              "case_review_id": "gemini:SYN-CART-BOUNDARY-003:case-02",
+              "title": "Checkout with zero item lines is below lower limit",
+              "test_case": {
+                "title": "Checkout with zero item lines is below lower limit",
+                "description": "Verify that an order containing fewer than one item line (zero item lines) is rejected before payment.",
+                "test_type": "functional",
+                "category": "boundary",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "User has an empty cart.",
+                "steps": [
+                  {
+                    "action": "Attempt to checkout an order containing zero item lines.",
+                    "expected_result": "The order is rejected before payment."
+                  }
+                ],
+                "expected_result": "Order with zero item lines is rejected before payment.",
+                "evidence_chunk_ids": [
+                  71021
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.6721132897603486,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.8951914098972923,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021
+                  ],
+                  "preliminary_note": "Evidence says accepted orders contain one through five lines, but does not state the behavior of a zero-line order."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "inconclusive",
+                  "note": "Evidence says accepted orders contain one through five lines, but does not state the behavior of a zero-line order."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Evidence says accepted orders contain one through five lines, but does not state the behavior of a zero-line order."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_unsubstantiated",
+                  "note": "Evidence says accepted orders contain one through five lines, but does not state the behavior of a zero-line order."
+                },
+                "unsupported_assumptions": [
+                  "Rejecting a zero-line order is not explicitly documented."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "hold_pending_evidence",
+                  "note": "Do not use as an asserted expected behavior until product evidence confirms the zero-line rule."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-RESET-EDGE-004",
+          "status": "completed",
+          "raw_output_source": "../gemini-real-run/gemini-real-20261113.json",
+          "raw_output_sha256": "c31b602cc00e94c0cfd883426f4e03ffe94880b95083b9b912cd75fa7a5c9609",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.6666666666666666,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 0.5,
+              "cited_text_token_overlap_heuristic": 0.5,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-RESET-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 0.0,
+              "covered": [],
+              "missing": [
+                "edge"
+              ],
+              "unexpected": [
+                "positive"
+              ]
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.7857142857142857,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.5,
+                "requested_category_quality": 0.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "gemini:SYN-RESET-EDGE-004:case-01",
+              "title": "Password reset code rejection after expiration",
+              "test_case": {
+                "title": "Password reset code rejection after expiration",
+                "description": "Verify that a password reset code is rejected when used after fifteen minutes from issuance.",
+                "test_type": "functional",
+                "category": "positive",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "A password reset code has been issued and more than fifteen minutes have elapsed.",
+                "steps": [
+                  {
+                    "action": "Attempt to use the expired password reset code.",
+                    "expected_result": "The password reset code is rejected."
+                  }
+                ],
+                "expected_result": "The code used after expiration is rejected.",
+                "evidence_chunk_ids": [
+                  71031
+                ],
+                "requirement_keys": [
+                  "SYN-RESET-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.6666666666666666,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.7857142857142857,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71031
+                  ],
+                  "preliminary_note": "Rejection after expiry is explicit in 71031; the dataset asks for edge coverage, but the output labels this as positive."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-RESET-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "partially_supported",
+                  "note": "Rejection after expiry is explicit in 71031; the dataset asks for edge coverage, but the output labels this as positive."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Rejection after expiry is explicit in 71031; the dataset asks for edge coverage, but the output labels this as positive."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "Rejection after expiry is explicit in 71031; the dataset asks for edge coverage, but the output labels this as positive."
+                },
+                "unsupported_assumptions": [
+                  "Scenario behavior is supported, but category positive conflicts with expected edge coverage; negative/edge classification should be reviewed."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_after_revision",
+                  "note": "Potentially useful expired-code case after correcting its category."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+          "status": "completed",
+          "raw_output_source": "../gemini-real-run/gemini-real-20261113.json",
+          "raw_output_sha256": "f31dd121041d129ad7ba6f39e88d146e34adc65bc6bbc652228d9c2e3523ffdd",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 1.0,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 1.0,
+              "valid_citation_count": 0,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": null,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "requested_category_coverage": 1.0
+              },
+              "human_review_required": false,
+              "human_review_scores": null
+            },
+            "generated_case_count": 0
+          },
+          "preliminary_output_assessment": "The model abstained with an empty test_cases list for an insufficient-evidence example, matching dataset guidance. This is an assistant preliminary assessment, not human sign-off.",
+          "cases": [],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        }
+      ]
+    },
+    {
+      "benchmark_run_id": "groq-real-20261113",
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "dataset_version": "1.0.0",
+      "dataset_sha256": "cd0068d130f3bdb7130c1714ec973c51ccf0a5cc9cf971aeccc17be57c70c702",
+      "source_report": "../groq-real-run/groq-real-20261113.json",
+      "examples": [
+        {
+          "example_id": "SYN-AUTH-POS-001",
+          "status": "completed",
+          "raw_output_source": "../groq-real-run/groq-real-20261113.json",
+          "raw_output_sha256": "07002743342b1a511a1d9fc050e1921f970145c71163c510758c302408a3d105",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.787878787878788,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 0.36363636363636365,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-AUTH-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [
+                "positive"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.9090909090909091,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.36363636363636365,
+                "requested_category_quality": 1.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "groq:SYN-AUTH-POS-001:case-01",
+              "title": "SYN-AUTH-POS-001: Successful login with correct credentials",
+              "test_case": {
+                "title": "SYN-AUTH-POS-001: Successful login with correct credentials",
+                "description": "Verify that a registered user can sign in using a valid email address and password and is redirected to the project dashboard.",
+                "test_type": "functional",
+                "category": "positive",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "A user account exists with email 'user@example.com' and password 'Password123'.",
+                "steps": [
+                  {
+                    "action": "Navigate to the login page",
+                    "expected_result": "Login page is displayed"
+                  },
+                  {
+                    "action": "Enter email 'user@example.com'",
+                    "expected_result": "Email field accepts input"
+                  },
+                  {
+                    "action": "Enter password 'Password123'",
+                    "expected_result": "Password field accepts input"
+                  },
+                  {
+                    "action": "Click the 'Sign In' button",
+                    "expected_result": "User is authenticated and redirected to the project dashboard"
+                  }
+                ],
+                "expected_result": "User is signed in and taken to the project dashboard",
+                "evidence_chunk_ids": [
+                  71001
+                ],
+                "requirement_keys": [
+                  "SYN-AUTH-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.787878787878788,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9090909090909091,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71001
+                  ],
+                  "preliminary_note": "Final sign-in and dashboard outcome are supported. Specific credentials and intermediate UI behaviors are absent from evidence 71001."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-AUTH-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "partially_supported",
+                  "note": "Final sign-in and dashboard outcome are supported. Specific credentials and intermediate UI behaviors are absent from evidence 71001."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Final sign-in and dashboard outcome are supported. Specific credentials and intermediate UI behaviors are absent from evidence 71001."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_contaminated_by_assumptions",
+                  "note": "Final sign-in and dashboard outcome are supported. Specific credentials and intermediate UI behaviors are absent from evidence 71001."
+                },
+                "unsupported_assumptions": [
+                  "Invented example email/password, page/navigation control names, field-acceptance behavior, and sign-in button label."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "revise_before_use",
+                  "note": "Core happy path is relevant, but remove unsupported UI/test-data assumptions before use."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-AUTH-NEG-002",
+          "status": "completed",
+          "raw_output_source": "../groq-real-run/groq-real-20261113.json",
+          "raw_output_sha256": "15e72f35f80d317973abc63bddbeb18438e9600438b3a4b58dd8fa4503e53797",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.8260869565217391,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 0.4782608695652174,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-AUTH-2"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [
+                "negative"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.9254658385093169,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.4782608695652174,
+                "requested_category_quality": 1.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "groq:SYN-AUTH-NEG-002:case-01",
+              "title": "SYN-AUTH-2: Empty Email Address Rejection",
+              "test_case": {
+                "title": "SYN-AUTH-2: Empty Email Address Rejection",
+                "description": "Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.",
+                "test_type": "functional",
+                "category": "negative",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Enter an empty string into the email address field and click the submit button",
+                    "expected_result": "The form submission is rejected and the message \"Email is required.\" is displayed"
+                  }
+                ],
+                "expected_result": "The form submission is rejected and the message \"Email is required.\" is displayed",
+                "evidence_chunk_ids": [
+                  71011
+                ],
+                "requirement_keys": [
+                  "SYN-AUTH-2"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8260869565217391,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9254658385093169,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71011
+                  ],
+                  "preliminary_note": "Empty email rejection and ?Email is required? are explicit in 71011."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-AUTH-2"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "supported",
+                  "note": "Empty email rejection and ?Email is required? are explicit in 71011."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Empty email rejection and ?Email is required? are explicit in 71011."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "Empty email rejection and ?Email is required? are explicit in 71011."
+                },
+                "unsupported_assumptions": [
+                  "Punctuation in the rendered error text may differ; verify exact message formatting."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_with_possible_step_split",
+                  "note": "Useful negative case; split field entry and submit into separate steps if the test harness needs atomic actions."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-CART-BOUNDARY-003",
+          "status": "completed",
+          "raw_output_source": "../groq-real-run/groq-real-20261113.json",
+          "raw_output_sha256": "574c8651633bfa5663372a7242d4f8aa2038a88f8b6dc188882e8a9f4cae2db2",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.8704212454212454,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 1.0,
+              "cited_text_token_overlap_heuristic": 0.6112637362637363,
+              "valid_citation_count": 8,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-CART-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 1.0,
+              "covered": [
+                "boundary",
+                "negative"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.9444662480376766,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.6112637362637363,
+                "requested_category_quality": 1.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 4
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "groq:SYN-CART-BOUNDARY-003:case-01",
+              "title": "SYN-CART-BOUNDARY-001: Checkout with minimum item lines (1)",
+              "test_case": {
+                "title": "SYN-CART-BOUNDARY-001: Checkout with minimum item lines (1)",
+                "description": "Verify checkout accepts an order containing exactly one item line.",
+                "test_type": "functional",
+                "category": "boundary",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Add 1 item line to the cart",
+                    "expected_result": "Checkout proceeds to payment"
+                  }
+                ],
+                "expected_result": "Checkout proceeds to payment",
+                "evidence_chunk_ids": [
+                  71021,
+                  71022
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8704212454212454,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9444662480376766,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021,
+                    71022
+                  ],
+                  "preliminary_note": "One item line is within the accepted range. Evidence 71022 constrains item lines versus per-line quantity but does not specify a payment-page transition."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "partially_supported",
+                  "note": "One item line is within the accepted range. Evidence 71022 constrains item lines versus per-line quantity but does not specify a payment-page transition."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "One item line is within the accepted range. Evidence 71022 constrains item lines versus per-line quantity but does not specify a payment-page transition."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_ui_outcome_inferred",
+                  "note": "One item line is within the accepted range. Evidence 71022 constrains item lines versus per-line quantity but does not specify a payment-page transition."
+                },
+                "unsupported_assumptions": [
+                  "?Checkout proceeds to payment? is a concrete UI transition not stated verbatim; acceptance is documented."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_pending_oracle_confirmation",
+                  "note": "Useful lower boundary candidate; confirm the observable acceptance signal with product behavior."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            },
+            {
+              "case_review_id": "groq:SYN-CART-BOUNDARY-003:case-02",
+              "title": "SYN-CART-BOUNDARY-002: Checkout with maximum item lines (5)",
+              "test_case": {
+                "title": "SYN-CART-BOUNDARY-002: Checkout with maximum item lines (5)",
+                "description": "Verify checkout accepts an order containing exactly five item lines.",
+                "test_type": "functional",
+                "category": "boundary",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Add 5 item lines to the cart",
+                    "expected_result": "Checkout proceeds to payment"
+                  }
+                ],
+                "expected_result": "Checkout proceeds to payment",
+                "evidence_chunk_ids": [
+                  71021,
+                  71022
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8704212454212454,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9444662480376766,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021,
+                    71022
+                  ],
+                  "preliminary_note": "Five item lines are within the accepted range; the exact next screen is not stated by 71021."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "partially_supported",
+                  "note": "Five item lines are within the accepted range; the exact next screen is not stated by 71021."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Five item lines are within the accepted range; the exact next screen is not stated by 71021."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_ui_outcome_inferred",
+                  "note": "Five item lines are within the accepted range; the exact next screen is not stated by 71021."
+                },
+                "unsupported_assumptions": [
+                  "?Checkout proceeds to payment? is a concrete UI transition not stated verbatim; acceptance is documented."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_pending_oracle_confirmation",
+                  "note": "Useful upper boundary candidate; confirm the observable acceptance signal."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            },
+            {
+              "case_review_id": "groq:SYN-CART-BOUNDARY-003:case-03",
+              "title": "SYN-CART-NEGATIVE-001: Checkout with zero item lines",
+              "test_case": {
+                "title": "SYN-CART-NEGATIVE-001: Checkout with zero item lines",
+                "description": "Verify checkout rejects an order with no item lines before payment.",
+                "test_type": "functional",
+                "category": "negative",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Attempt to checkout with an empty cart",
+                    "expected_result": "Checkout is rejected before payment"
+                  }
+                ],
+                "expected_result": "Checkout is rejected before payment",
+                "evidence_chunk_ids": [
+                  71021,
+                  71022
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8704212454212454,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9444662480376766,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021,
+                    71022
+                  ],
+                  "preliminary_note": "The documented accepted range starts at one, but no zero-line rejection behavior is specified."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "inconclusive",
+                  "note": "The documented accepted range starts at one, but no zero-line rejection behavior is specified."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "The documented accepted range starts at one, but no zero-line rejection behavior is specified."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_unsubstantiated",
+                  "note": "The documented accepted range starts at one, but no zero-line rejection behavior is specified."
+                },
+                "unsupported_assumptions": [
+                  "Rejecting an empty cart is not explicitly documented."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "hold_pending_evidence",
+                  "note": "Hold pending product confirmation of zero-line behavior."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            },
+            {
+              "case_review_id": "groq:SYN-CART-BOUNDARY-003:case-04",
+              "title": "SYN-CART-NEGATIVE-002: Checkout with more than maximum item lines (6)",
+              "test_case": {
+                "title": "SYN-CART-NEGATIVE-002: Checkout with more than maximum item lines (6)",
+                "description": "Verify checkout rejects an order containing more than five item lines before payment.",
+                "test_type": "functional",
+                "category": "negative",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Add 6 item lines to the cart",
+                    "expected_result": "Checkout is rejected before payment"
+                  }
+                ],
+                "expected_result": "Checkout is rejected before payment",
+                "evidence_chunk_ids": [
+                  71021,
+                  71022
+                ],
+                "requirement_keys": [
+                  "SYN-CART-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.8704212454212454,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.9444662480376766,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71021,
+                    71022
+                  ],
+                  "preliminary_note": "More than five item lines are explicitly rejected before payment in 71021."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-CART-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "supported",
+                  "note": "More than five item lines are explicitly rejected before payment in 71021."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "More than five item lines are explicitly rejected before payment in 71021."
+                },
+                "expected_result_specificity": {
+                  "status": "specific",
+                  "note": "More than five item lines are explicitly rejected before payment in 71021."
+                },
+                "unsupported_assumptions": [],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful",
+                  "note": "Useful upper-bound negative case."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-RESET-EDGE-004",
+          "status": "completed",
+          "raw_output_source": "../groq-real-run/groq-real-20261113.json",
+          "raw_output_sha256": "d33d1dcd63b9bbeb62fd6bc67fbe7cfd6acab0ef6f74cf1ce011834f3008eb9e",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.5737179487179488,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 0.5,
+              "cited_text_token_overlap_heuristic": 0.22115384615384615,
+              "valid_citation_count": 2,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [
+                "SYN-RESET-1"
+              ],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 0.0,
+              "covered": [],
+              "missing": [
+                "edge"
+              ],
+              "unexpected": [
+                "negative",
+                "positive"
+              ]
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.7458791208791208,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.22115384615384615,
+                "requested_category_quality": 0.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 2
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "groq:SYN-RESET-EDGE-004:case-01",
+              "title": "Password reset code accepted within 15 minutes",
+              "test_case": {
+                "title": "Password reset code accepted within 15 minutes",
+                "description": "Verify that a password reset code is accepted when used before the 15-minute expiry period.",
+                "test_type": "functional",
+                "category": "positive",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Issue a password reset code to the user",
+                    "expected_result": "Reset code is generated and sent to the user"
+                  },
+                  {
+                    "action": "Wait 10 minutes",
+                    "expected_result": "Time elapsed is less than 15 minutes"
+                  },
+                  {
+                    "action": "Submit the reset code to the password reset endpoint",
+                    "expected_result": "Password reset is successful and user is prompted to set a new password"
+                  }
+                ],
+                "expected_result": "Password reset succeeds within the 15-minute window",
+                "evidence_chunk_ids": [
+                  71031
+                ],
+                "requirement_keys": [
+                  "SYN-RESET-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.5737179487179488,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.7458791208791208,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71031
+                  ],
+                  "preliminary_note": "Available evidence documents expiry and rejection after expiry, not successful use before expiry."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-RESET-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "inconclusive",
+                  "note": "Available evidence documents expiry and rejection after expiry, not successful use before expiry."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Available evidence documents expiry and rejection after expiry, not successful use before expiry."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_unsubstantiated",
+                  "note": "Available evidence documents expiry and rejection after expiry, not successful use before expiry."
+                },
+                "unsupported_assumptions": [
+                  "Acceptance before expiry, reset-code delivery, endpoint, successful reset, and prompting for a new password are not documented."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "hold_pending_evidence",
+                  "note": "Do not use as a positive expected behavior without additional evidence."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            },
+            {
+              "case_review_id": "groq:SYN-RESET-EDGE-004:case-02",
+              "title": "Password reset code rejected after 15 minutes",
+              "test_case": {
+                "title": "Password reset code rejected after 15 minutes",
+                "description": "Verify that a password reset code is rejected when used after the 15-minute expiry period.",
+                "test_type": "functional",
+                "category": "negative",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Issue a password reset code to the user",
+                    "expected_result": "Reset code is generated and sent to the user"
+                  },
+                  {
+                    "action": "Wait 16 minutes",
+                    "expected_result": "Time elapsed exceeds 15 minutes"
+                  },
+                  {
+                    "action": "Submit the reset code to the password reset endpoint",
+                    "expected_result": "Password reset is rejected with an error indicating the code has expired"
+                  }
+                ],
+                "expected_result": "Password reset fails due to expired code",
+                "evidence_chunk_ids": [
+                  71031
+                ],
+                "requirement_keys": [
+                  "SYN-RESET-1"
+                ]
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.5737179487179488,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.7458791208791208,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71031
+                  ],
+                  "preliminary_note": "Rejection after 15 minutes is documented; 16 minutes is beyond the threshold, but the exact error text is not."
+                },
+                "requirement_coverage": {
+                  "status": "complete",
+                  "requirement_keys": [
+                    "SYN-RESET-1"
+                  ],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "partially_supported",
+                  "note": "Rejection after 15 minutes is documented; 16 minutes is beyond the threshold, but the exact error text is not."
+                },
+                "action_clarity": {
+                  "status": "clear",
+                  "note": "Rejection after 15 minutes is documented; 16 minutes is beyond the threshold, but the exact error text is not."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_partly_unsubstantiated",
+                  "note": "Rejection after 15 minutes is documented; 16 minutes is beyond the threshold, but the exact error text is not."
+                },
+                "unsupported_assumptions": [
+                  "Specific expired-code error text is not documented; setup and delivery details are assumptions."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "useful_after_revision",
+                  "note": "Useful expired-code test after replacing the asserted error details with an observable documented outcome."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        },
+        {
+          "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+          "status": "completed",
+          "raw_output_source": "../groq-real-run/groq-real-20261113.json",
+          "raw_output_sha256": "049fcafdf2dc6d5267dafb9b1d6bc1a995edfa6b167a660cd0e56036e9282265",
+          "automated_example_findings": {
+            "structured_output": {
+              "valid": true,
+              "failure_category": null,
+              "errors": [],
+              "required_fields_present": true,
+              "category_and_priority_valid": true,
+              "step_structure_valid": true,
+              "valid_evidence_references": true,
+              "fully_valid": true
+            },
+            "evidence_accuracy": {
+              "score": 0.4047619047619047,
+              "citation_precision": 1.0,
+              "relevant_evidence_recall": 0.0,
+              "cited_text_token_overlap_heuristic": 0.21428571428571427,
+              "valid_citation_count": 1,
+              "invalid_citation_count": 0,
+              "unsupported_claim_rate": 0.0,
+              "unsupported_case_count": 0,
+              "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+            },
+            "requirement_coverage": {
+              "score": 1.0,
+              "covered": [],
+              "missing": [],
+              "unexpected": []
+            },
+            "category_coverage": {
+              "score": 0.0,
+              "covered": [],
+              "missing": [],
+              "unexpected": [
+                "positive"
+              ]
+            },
+            "usefulness": {
+              "test_case_usefulness_score": 0.7448979591836735,
+              "deterministic_components": {
+                "requirement_coverage": 1.0,
+                "action_clarity_length_heuristic": 1.0,
+                "expected_result_clarity_length_heuristic": 1.0,
+                "testability_schema_and_step_completeness": 1.0,
+                "evidence_specificity_token_overlap": 0.21428571428571427,
+                "requested_category_quality": 0.0,
+                "non_redundancy_similarity_heuristic": 1.0
+              },
+              "human_review_required": true,
+              "human_review_scores": null
+            },
+            "generated_case_count": 1
+          },
+          "preliminary_output_assessment": null,
+          "cases": [
+            {
+              "case_review_id": "groq:SYN-EXPORT-INSUFFICIENT-005:case-01",
+              "title": "Verify export feature availability",
+              "test_case": {
+                "title": "Verify export feature availability",
+                "description": "Ensure that the product provides an export feature as specified.",
+                "test_type": "functional",
+                "category": "positive",
+                "priority": "medium",
+                "severity": "medium",
+                "preconditions": "",
+                "steps": [
+                  {
+                    "action": "Navigate to the export functionality",
+                    "expected_result": "Export option is displayed and accessible"
+                  }
+                ],
+                "expected_result": "Export feature is available for use",
+                "evidence_chunk_ids": [
+                  71041
+                ],
+                "requirement_keys": []
+              },
+              "automated_findings": {
+                "benchmark_example_scores": {
+                  "schema_valid": true,
+                  "valid_evidence_references": true,
+                  "evidence_accuracy_proxy": 0.4047619047619047,
+                  "requirement_coverage_proxy": 1.0,
+                  "usefulness_proxy": 0.7448979591836735,
+                  "unsupported_phrase_match_rate": 0.0
+                },
+                "citation_ids_exist_in_dataset": true,
+                "semantic_entailment_proven": false,
+                "limitation": "Citation validity and lexical scores do not prove that the cited text entails every assertion."
+              },
+              "preliminary_assessment": {
+                "provenance": "assistant_preliminary_not_human_review",
+                "evidence_traceability": {
+                  "status": "reference_ids_valid",
+                  "cited_ids": [
+                    71041
+                  ],
+                  "preliminary_note": "Evidence 71041 confirms only that an export feature exists and supplies no user-observable behavior."
+                },
+                "requirement_coverage": {
+                  "status": "not_applicable",
+                  "requirement_keys": [],
+                  "preliminary_note": "See the dataset criteria and note whether the case covers the required behavior."
+                },
+                "scenario_correctness": {
+                  "status": "inconclusive",
+                  "note": "Evidence 71041 confirms only that an export feature exists and supplies no user-observable behavior."
+                },
+                "action_clarity": {
+                  "status": "partial",
+                  "note": "Evidence 71041 confirms only that an export feature exists and supplies no user-observable behavior."
+                },
+                "expected_result_specificity": {
+                  "status": "specific_but_unsubstantiated",
+                  "note": "Evidence 71041 confirms only that an export feature exists and supplies no user-observable behavior."
+                },
+                "unsupported_assumptions": [
+                  "Navigation path, visible/accessibility state, and usability are not supported by the statement that an export feature exists."
+                ],
+                "redundancy": {
+                  "status": "not_redundant",
+                  "scope": "Compared only with cases from this same provider and dataset example."
+                },
+                "practical_usefulness": {
+                  "status": "hold_pending_evidence",
+                  "note": "The dataset explicitly expects abstention; this generated case should not be used without further evidence."
+                }
+              },
+              "human_review": {
+                "status": "pending",
+                "reviewer_decision": null,
+                "reviewer_comments": null,
+                "dimension_ratings": {
+                  "evidence_traceability": null,
+                  "requirement_coverage": null,
+                  "scenario_correctness": null,
+                  "action_clarity": null,
+                  "expected_result_specificity": null,
+                  "unsupported_assumptions": null,
+                  "redundancy": null,
+                  "practical_usefulness": null
+                },
+                "final_rating": null
+              }
+            }
+          ],
+          "human_review": {
+            "status": "pending",
+            "reviewer_decision": null,
+            "reviewer_comments": null,
+            "final_rating": null
+          }
+        }
+      ]
+    }
+  ],
+  "review_template": {
+    "reviewer_decision": [
+      "accept",
+      "revise",
+      "reject",
+      "inconclusive"
+    ],
+    "reviewer_comments": null,
+    "final_rating": [
+      "accept",
+      "revise",
+      "reject",
+      "inconclusive"
+    ],
+    "dimension_ratings": [
+      "evidence_traceability",
+      "requirement_coverage",
+      "scenario_correctness",
+      "action_clarity",
+      "expected_result_specificity",
+      "unsupported_assumptions",
+      "redundancy",
+      "practical_usefulness"
+    ]
+  },
+  "limitations": [
+    "Assistant-generated preliminary observations are not human review.",
+    "Valid evidence IDs and lexical overlap do not prove semantic support.",
+    "Benchmark scores are example-level deterministic proxies, not per-case semantic judgments."
+  ]
+}

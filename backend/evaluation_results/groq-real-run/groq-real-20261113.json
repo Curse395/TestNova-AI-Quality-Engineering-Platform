@@ -1,0 +1,524 @@
+{
+  "report_schema_version": "1.0.0",
+  "benchmark_run_id": "groq-real-20261113",
+  "created_at": "2026-11-13T11:53:11.257730+00:00",
+  "dataset": {
+    "name": "TestNova synthetic evidence-grounded test-case generation",
+    "version": "1.0.0",
+    "sha256": "cd0068d130f3bdb7130c1714ec973c51ccf0a5cc9cf971aeccc17be57c70c702",
+    "example_ids": [
+      "SYN-AUTH-POS-001",
+      "SYN-AUTH-NEG-002",
+      "SYN-CART-BOUNDARY-003",
+      "SYN-RESET-EDGE-004",
+      "SYN-EXPORT-INSUFFICIENT-005"
+    ],
+    "selected_example_ids": [
+      "SYN-AUTH-POS-001",
+      "SYN-AUTH-NEG-002",
+      "SYN-CART-BOUNDARY-003",
+      "SYN-RESET-EDGE-004",
+      "SYN-EXPORT-INSUFFICIENT-005"
+    ]
+  },
+  "configuration": {
+    "provider": "groq",
+    "model": "openai/gpt-oss-20b",
+    "temperature": 0.0,
+    "fallback_enabled": false,
+    "execution_mode": "live",
+    "max_output_tokens": 4096,
+    "top_p": 1.0,
+    "top_k": 40,
+    "response_mime_type": "application/json",
+    "system_prompt_sha256": "c957ffa1b539bb9d403f48823a049242fac666939655a152376c6e82183e36b2",
+    "user_prompt_template_sha256": "770f554f3e37acec6363b7b0b025e34d1a5a88ff6e2064d24c3800a0dfcfe235"
+  },
+  "results": [
+    {
+      "example_id": "SYN-AUTH-POS-001",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-AUTH-POS-001: Successful login with correct credentials\",\"description\":\"Verify that a registered user can sign in using a valid email address and password and is redirected to the project dashboard.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"A user account exists with email 'user@example.com' and password 'Password123'.\",\"steps\":[{\"action\":\"Navigate to the login page\",\"expected_result\":\"Login page is displayed\"},{\"action\":\"Enter email 'user@example.com'\",\"expected_result\":\"Email field accepts input\"},{\"action\":\"Enter password 'Password123'\",\"expected_result\":\"Password field accepts input\"},{\"action\":\"Click the 'Sign In' button\",\"expected_result\":\"User is authenticated and redirected to the project dashboard\"}],\"expected_result\":\"User is signed in and taken to the project dashboard\",\"evidence_chunk_ids\":[71001],\"requirement_keys\":[\"SYN-AUTH-1\"]}]}",
+      "overall_latency_ms": 1172.259099999792,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.787878787878788,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 0.36363636363636365,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-AUTH-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [
+            "positive"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.9090909090909091,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.36363636363636365,
+            "requested_category_quality": 1.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "request_timestamp": "2026-11-13T11:53:05.100137+00:00",
+          "completion_timestamp": "2026-11-13T11:53:06.273075+00:00",
+          "latency_ms": 1172.1398000008776,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 384,
+          "output_token_count": 358,
+          "total_token_count": 742,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "groq-real-20261113:SYN-AUTH-POS-001",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "groq",
+          "primary_model": "openai/gpt-oss-20b",
+          "final_provider": "groq",
+          "final_model": "openai/gpt-oss-20b"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-AUTH-NEG-002",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-AUTH-2: Empty Email Address Rejection\",\"description\":\"Verify that submitting the sign-in form with an empty email address is rejected and displays the appropriate error message.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Enter an empty string into the email address field and click the submit button\",\"expected_result\":\"The form submission is rejected and the message \\\"Email is required.\\\" is displayed\"}],\"expected_result\":\"The form submission is rejected and the message \\\"Email is required.\\\" is displayed\",\"evidence_chunk_ids\":[71011],\"requirement_keys\":[\"SYN-AUTH-2\"]}]}",
+      "overall_latency_ms": 513.6667999977362,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.8260869565217391,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 0.4782608695652174,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-AUTH-2"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [
+            "negative"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.9254658385093169,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.4782608695652174,
+            "requested_category_quality": 1.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "request_timestamp": "2026-11-13T11:53:06.273075+00:00",
+          "completion_timestamp": "2026-11-13T11:53:06.786130+00:00",
+          "latency_ms": 513.5480000026291,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 381,
+          "output_token_count": 289,
+          "total_token_count": 670,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "groq-real-20261113:SYN-AUTH-NEG-002",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "groq",
+          "primary_model": "openai/gpt-oss-20b",
+          "final_provider": "groq",
+          "final_model": "openai/gpt-oss-20b"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-CART-BOUNDARY-003",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"SYN-CART-BOUNDARY-001: Checkout with minimum item lines (1)\",\"description\":\"Verify checkout accepts an order containing exactly one item line.\",\"test_type\":\"functional\",\"category\":\"boundary\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 1 item line to the cart\",\"expected_result\":\"Checkout proceeds to payment\"}],\"expected_result\":\"Checkout proceeds to payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-BOUNDARY-002: Checkout with maximum item lines (5)\",\"description\":\"Verify checkout accepts an order containing exactly five item lines.\",\"test_type\":\"functional\",\"category\":\"boundary\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 5 item lines to the cart\",\"expected_result\":\"Checkout proceeds to payment\"}],\"expected_result\":\"Checkout proceeds to payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-NEGATIVE-001: Checkout with zero item lines\",\"description\":\"Verify checkout rejects an order with no item lines before payment.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Attempt to checkout with an empty cart\",\"expected_result\":\"Checkout is rejected before payment\"}],\"expected_result\":\"Checkout is rejected before payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]},{\"title\":\"SYN-CART-NEGATIVE-002: Checkout with more than maximum item lines (6)\",\"description\":\"Verify checkout rejects an order containing more than five item lines before payment.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Add 6 item lines to the cart\",\"expected_result\":\"Checkout is rejected before payment\"}],\"expected_result\":\"Checkout is rejected before payment\",\"evidence_chunk_ids\":[71021,71022],\"requirement_keys\":[\"SYN-CART-1\"]}]}",
+      "overall_latency_ms": 1646.9742999979644,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.8704212454212454,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 1.0,
+          "cited_text_token_overlap_heuristic": 0.6112637362637363,
+          "valid_citation_count": 8,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-CART-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 1.0,
+          "covered": [
+            "boundary",
+            "negative"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.9444662480376766,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.6112637362637363,
+            "requested_category_quality": 1.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 4
+      },
+      "attempts": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "request_timestamp": "2026-11-13T11:53:06.786130+00:00",
+          "completion_timestamp": "2026-11-13T11:53:08.434906+00:00",
+          "latency_ms": 1646.8327999973553,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 427,
+          "output_token_count": 1109,
+          "total_token_count": 1536,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "groq-real-20261113:SYN-CART-BOUNDARY-003",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "groq",
+          "primary_model": "openai/gpt-oss-20b",
+          "final_provider": "groq",
+          "final_model": "openai/gpt-oss-20b"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-RESET-EDGE-004",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Password reset code accepted within 15 minutes\",\"description\":\"Verify that a password reset code is accepted when used before the 15-minute expiry period.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Issue a password reset code to the user\",\"expected_result\":\"Reset code is generated and sent to the user\"},{\"action\":\"Wait 10 minutes\",\"expected_result\":\"Time elapsed is less than 15 minutes\"},{\"action\":\"Submit the reset code to the password reset endpoint\",\"expected_result\":\"Password reset is successful and user is prompted to set a new password\"}],\"expected_result\":\"Password reset succeeds within the 15-minute window\",\"evidence_chunk_ids\":[71031],\"requirement_keys\":[\"SYN-RESET-1\"]},{\"title\":\"Password reset code rejected after 15 minutes\",\"description\":\"Verify that a password reset code is rejected when used after the 15-minute expiry period.\",\"test_type\":\"functional\",\"category\":\"negative\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Issue a password reset code to the user\",\"expected_result\":\"Reset code is generated and sent to the user\"},{\"action\":\"Wait 16 minutes\",\"expected_result\":\"Time elapsed exceeds 15 minutes\"},{\"action\":\"Submit the reset code to the password reset endpoint\",\"expected_result\":\"Password reset is rejected with an error indicating the code has expired\"}],\"expected_result\":\"Password reset fails due to expired code\",\"evidence_chunk_ids\":[71031],\"requirement_keys\":[\"SYN-RESET-1\"]}]}",
+      "overall_latency_ms": 1466.1440000054426,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.5737179487179488,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 0.5,
+          "cited_text_token_overlap_heuristic": 0.22115384615384615,
+          "valid_citation_count": 2,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [
+            "SYN-RESET-1"
+          ],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 0.0,
+          "covered": [],
+          "missing": [
+            "edge"
+          ],
+          "unexpected": [
+            "negative",
+            "positive"
+          ]
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.7458791208791208,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.22115384615384615,
+            "requested_category_quality": 0.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 2
+      },
+      "attempts": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "request_timestamp": "2026-11-13T11:53:08.440258+00:00",
+          "completion_timestamp": "2026-11-13T11:53:09.906676+00:00",
+          "latency_ms": 1466.0160999992513,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 416,
+          "output_token_count": 692,
+          "total_token_count": 1108,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "groq-real-20261113:SYN-RESET-EDGE-004",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "groq",
+          "primary_model": "openai/gpt-oss-20b",
+          "final_provider": "groq",
+          "final_model": "openai/gpt-oss-20b"
+        }
+      ]
+    },
+    {
+      "example_id": "SYN-EXPORT-INSUFFICIENT-005",
+      "status": "completed",
+      "raw_output": "{\"test_cases\":[{\"title\":\"Verify export feature availability\",\"description\":\"Ensure that the product provides an export feature as specified.\",\"test_type\":\"functional\",\"category\":\"positive\",\"priority\":\"medium\",\"severity\":\"medium\",\"preconditions\":\"\",\"steps\":[{\"action\":\"Navigate to the export functionality\",\"expected_result\":\"Export option is displayed and accessible\"}],\"expected_result\":\"Export feature is available for use\",\"evidence_chunk_ids\":[71041],\"requirement_keys\":[]}]}",
+      "overall_latency_ms": 1349.8856000005617,
+      "scores": {
+        "structured_output": {
+          "valid": true,
+          "failure_category": null,
+          "errors": [],
+          "required_fields_present": true,
+          "category_and_priority_valid": true,
+          "step_structure_valid": true,
+          "valid_evidence_references": true,
+          "fully_valid": true
+        },
+        "evidence_accuracy": {
+          "score": 0.4047619047619047,
+          "citation_precision": 1.0,
+          "relevant_evidence_recall": 0.0,
+          "cited_text_token_overlap_heuristic": 0.21428571428571427,
+          "valid_citation_count": 1,
+          "invalid_citation_count": 0,
+          "unsupported_claim_rate": 0.0,
+          "unsupported_case_count": 0,
+          "unsupported_claim_detection": "exact_dataset_phrase_match_only"
+        },
+        "requirement_coverage": {
+          "score": 1.0,
+          "covered": [],
+          "missing": [],
+          "unexpected": []
+        },
+        "category_coverage": {
+          "score": 0.0,
+          "covered": [],
+          "missing": [],
+          "unexpected": [
+            "positive"
+          ]
+        },
+        "usefulness": {
+          "test_case_usefulness_score": 0.7448979591836735,
+          "deterministic_components": {
+            "requirement_coverage": 1.0,
+            "action_clarity_length_heuristic": 1.0,
+            "expected_result_clarity_length_heuristic": 1.0,
+            "testability_schema_and_step_completeness": 1.0,
+            "evidence_specificity_token_overlap": 0.21428571428571427,
+            "requested_category_quality": 0.0,
+            "non_redundancy_similarity_heuristic": 1.0
+          },
+          "human_review_required": true,
+          "human_review_scores": null
+        },
+        "generated_case_count": 1
+      },
+      "attempts": [
+        {
+          "provider": "groq",
+          "model": "openai/gpt-oss-20b",
+          "request_timestamp": "2026-11-13T11:53:09.906676+00:00",
+          "completion_timestamp": "2026-11-13T11:53:11.257730+00:00",
+          "latency_ms": 1349.7673999954714,
+          "success": true,
+          "error_category": null,
+          "input_token_count": 373,
+          "output_token_count": 729,
+          "total_token_count": 1102,
+          "estimated_cost": null,
+          "estimated_cost_currency": null,
+          "cost_is_estimate": false,
+          "request_id": "groq-real-20261113:SYN-EXPORT-INSUFFICIENT-005",
+          "attempt_number": 1,
+          "is_fallback_attempt": false,
+          "fallback_attempted": false,
+          "fallback_succeeded": false,
+          "primary_provider": "groq",
+          "primary_model": "openai/gpt-oss-20b",
+          "final_provider": "groq",
+          "final_model": "openai/gpt-oss-20b"
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "example_count": 5,
+    "completed_examples": 5,
+    "failed_examples": 0,
+    "skipped_examples": 0,
+    "successful_examples": 5,
+    "failed_call_count": 0,
+    "structured_output_validity_rate": 1.0,
+    "json_schema_validity_rate": 1.0,
+    "evidence_accuracy_score": 0.6925733686603253,
+    "unsupported_claim_rate": 0.0,
+    "requirement_coverage": 1.0,
+    "test_case_usefulness_score": 0.8539600151401393,
+    "human_reviewed_usefulness_score": null,
+    "latency_ms": {
+      "count": 5,
+      "average": 1229.660819999117,
+      "median": 1349.7673999954714,
+      "measurement": "live_provider_attempts"
+    },
+    "request_latency_ms": {
+      "count": 5,
+      "average": 1229.7859600002994,
+      "median": 1349.8856000005617,
+      "measurement": "live_end_to_end_request"
+    },
+    "input_tokens": {
+      "total": 1981,
+      "coverage": 1.0
+    },
+    "output_tokens": {
+      "total": 3177,
+      "coverage": 1.0
+    },
+    "total_tokens": {
+      "total": 5158,
+      "coverage": 1.0
+    },
+    "estimated_cost": {
+      "total": null,
+      "currency": null,
+      "coverage": 0.0,
+      "is_estimate": null,
+      "measurement": "configured_estimate"
+    },
+    "telemetry_attempt_count": 5
+  },
+  "limitations": [
+    "Evidence and unsupported-claim checks are deterministic lexical/reference checks, not semantic proof.",
+    "Usefulness score is a deterministic proxy; human review is required for subjective quality.",
+    "Metrics from mocked services are not model performance measurements.",
+    "Telemetry and benchmark results are local files and in-memory during the run, not database-persisted."
+  ]
+}

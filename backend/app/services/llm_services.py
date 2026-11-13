@@ -1,126 +1,127 @@
-import logging
-from google import genai
-from google.genai import types 
 from app.core.config import settings
+from app.llm.contracts import (
+    GenerationParameters,
+    LLMConfigurationException,
+    LLMGenerationRequest,
+    LLMProvider,
+    LLMResponse,
+    StructuredOutputConfig,
+)
+from app.llm.providers import get_default_provider, get_provider
+from app.llm.router import LLMRouter
+from app.llm.telemetry import LLMTelemetrySink
 
-logger=logging.getLogger(__name__)
 
 class LLMService:
+    """Provider-neutral entry point for language model generation."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        provider: LLMProvider | None = None,
+        *,
+        provider_name: str | None = None,
+        model_name: str | None = None,
+        fallback_enabled: bool | None = None,
+        fallback_provider_name: str | None = None,
+        fallback_model_name: str | None = None,
+        telemetry_service: LLMTelemetrySink | None = None,
+    ) -> None:
+        if provider is not None:
+            if provider_name is not None and (
+                provider_name.strip().lower() != provider.provider_name
+            ):
+                raise LLMConfigurationException(
+                    provider_name,
+                    "Injected provider does not match configured provider",
+                )
+            if model_name is not None and model_name != provider.model_name:
+                raise LLMConfigurationException(
+                    provider.provider_name,
+                    "Injected provider does not match configured model",
+                )
+            self.provider = provider
+        elif provider_name is None and model_name is None:
+            self.provider = get_default_provider()
+        else:
+            selected_provider = (
+                provider_name or settings.LLM_PROVIDER
+            ).strip().lower()
+            self.provider = get_provider(selected_provider, model_name)
 
-        self.api_key = settings.GEMINI_API_KEY
-        self.model_name = settings.GEMINI_MODEL
-        self.temperature = settings.TEMPERATURE
-        self.max_output_tokens = settings.MAX_OUTPUT_TOKENS
-        self.top_p = settings.TOP_P
-        self.top_k = settings.TOP_K
-
-        self._validate_configuration()
-        self.client=self._initialize_client()
-
-        logger.info("LLM initialized successfully with model: %s", self.model_name)
-
-        self.generation_config=types.GenerateContentConfig(
-            temperature=self.temperature,
-            top_p=self.top_p,
-            top_k=self.top_k,
-            max_output_tokens=self.max_output_tokens,
+        self.provider_name = self.provider.provider_name
+        self.model_name = self.provider.model_name
+        self.generation_parameters = GenerationParameters(
+            temperature=settings.TEMPERATURE,
+            max_output_tokens=settings.MAX_OUTPUT_TOKENS,
+            top_p=settings.TOP_P,
+            top_k=settings.TOP_K,
+        )
+        self.fallback_enabled = (
+            settings.LLM_FALLBACK_ENABLED
+            if fallback_enabled is None
+            else fallback_enabled
+        )
+        self.fallback_provider: LLMProvider | None = None
+        if self.fallback_enabled:
+            selected_fallback = (
+                fallback_provider_name or settings.LLM_FALLBACK_PROVIDER
+            )
+            if selected_fallback is None:
+                raise LLMConfigurationException(
+                    self.provider_name,
+                    "Fallback provider is not configured",
+                )
+            selected_fallback = selected_fallback.strip().lower()
+            if selected_fallback == self.provider_name:
+                raise LLMConfigurationException(
+                    selected_fallback,
+                    "Fallback provider must differ from primary provider",
+                )
+            selected_fallback_model = (
+                fallback_model_name
+                if fallback_model_name is not None
+                else settings.LLM_FALLBACK_MODEL
+            )
+            self.fallback_provider = get_provider(
+                selected_fallback,
+                selected_fallback_model,
+            )
+        self.router = LLMRouter(
+            self.provider,
+            self.fallback_provider,
+            telemetry_service=telemetry_service,
         )
 
-    def _validate_configuration(self):
-        if not self.api_key:
-            raise RuntimeError("Gemini API key is not configured")
-
-    def _initialize_client(self):
-        return genai.Client(api_key=self.api_key)
-
-    @staticmethod
-    def _finish_reason(response) -> str | None:
-        candidates = getattr(response, "candidates", None)
-        candidate = candidates[0] if candidates else None
-        reason = getattr(candidate, "finish_reason", None)
-        if reason is None:
-            return None
-        return getattr(reason, "name", str(reason))
+    def generate(self, request: LLMGenerationRequest) -> LLMResponse:
+        return self.router.generate(request)
 
     def generate_content(
         self,
         system_prompt: str,
         user_prompt: str,
         response_mime_type: str | None = None,
-    ) -> dict:
-        config = self.generation_config.model_copy(
-            update={
-                "system_instruction": system_prompt,
-                "response_mime_type": response_mime_type,
-            }
+    ) -> dict[str, str | bool]:
+        request = LLMGenerationRequest(
+            provider=self.provider_name,
+            model=self.model_name,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            generation_parameters=self.generation_parameters,
+            structured_output=(
+                StructuredOutputConfig(response_mime_type=response_mime_type)
+                if response_mime_type is not None
+                else None
+            ),
         )
-
-        try:
-            logger.info("Calling Gemini model: %s", self.model_name)
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=user_prompt,
-                config=config,
-            )
-        except Exception as exc:
-            logger.error(
-                "Gemini provider request failed: model=%s error_type=%s",
-                self.model_name,
-                type(exc).__name__,
-            )
-            return {
-                "success": False,
-                "answer": "",
-                "model": self.model_name,
-                "stage": "provider_request",
-                "error": "Gemini provider request failed",
-            }
-
-        finish_reason = self._finish_reason(response)
-        try:
-            answer = response.text
-        except Exception as exc:
-            logger.error(
-                "Gemini response text extraction failed: model=%s error_type=%s finish_reason=%s",
-                self.model_name,
-                type(exc).__name__,
-                finish_reason,
-            )
-            return {
-                "success": False,
-                "answer": "",
-                "model": self.model_name,
-                "stage": "response_extraction",
-                "finish_reason": finish_reason,
-                "error": "Gemini response text could not be extracted",
-            }
-
-        if not isinstance(answer, str) or not answer.strip():
-            logger.warning(
-                "Gemini returned no text: model=%s finish_reason=%s",
-                self.model_name,
-                finish_reason,
-            )
-            return {
-                "success": False,
-                "answer": "",
-                "model": self.model_name,
-                "stage": "empty_response",
-                "finish_reason": finish_reason,
-                "error": "Gemini returned no text content",
-            }
-
-        logger.info(
-            "Gemini response received: model=%s characters=%d finish_reason=%s",
-            self.model_name,
-            len(answer),
-            finish_reason,
-        )
-        return {
-            "success": True,
-            "answer": answer,
-            "model": self.model_name,
-            "stage": "complete",
+        response = self.generate(request)
+        result: dict[str, str | bool] = {
+            "success": response.success,
+            "answer": response.text,
+            "model": response.model,
+            "stage": response.stage,
         }
+        if response.error is not None:
+            result["error"] = response.error
+        if response.finish_reason is not None:
+            result["finish_reason"] = response.finish_reason
+        return result

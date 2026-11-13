@@ -7,6 +7,7 @@ class TestCase(Base):
     __tablename__ ="test_cases"
     __table_args__=(CheckConstraint("category IN ('positive','negative','boundary','edge')",name="ck_test_case_category"),
                     CheckConstraint("priority IN ('low','medium','high','critical')",name="ck_test_cases_priority"),
+                    CheckConstraint("severity IN ('low','medium','high','critical')",name="ck_test_cases_severity"),
                     CheckConstraint("review_status IN ('draft','approved','rejected')",name="ck_test_cases_review_status"),
                     Index("ix_test_cases_project_id","project_id"))
     id=Column(Integer,primary_key=True,index=True)
@@ -14,8 +15,10 @@ class TestCase(Base):
     created_by_user_id=Column(Integer,ForeignKey("users.id"),nullable=False)
     title=Column(String(200),nullable=False)
     description=Column(Text,nullable=False)
+    test_type=Column(String(60),nullable=True)
     category=Column(String(20),nullable=False)
     priority=Column(String(20),nullable=False)
+    severity=Column(String(20),nullable=False,default="medium")
     preconditions=Column(Text,nullable=True)
     steps=Column(JSON,nullable=False)
     expected_result=Column(Text,nullable=False)
@@ -26,3 +29,8 @@ class TestCase(Base):
     project=relationship("Project")
     created_by=relationship("User")
     evidence=relationship("TestCaseEvidence",back_populates="test_case",cascade="all, delete-orphan")
+    requirement_links=relationship(
+        "TestCaseRequirement",
+        back_populates="test_case",
+        cascade="all, delete-orphan",
+    )

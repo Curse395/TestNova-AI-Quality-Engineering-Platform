@@ -8,6 +8,7 @@ import UploadPage from './pages/UploadPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AssistantPage from './pages/AssistantPage'
 import TestCasesPage from './pages/TestCasesPage'
+import WorkflowsPage from './pages/WorkflowsPage'
 import ReleaseReadinessPage from './pages/ReleaseReadinessPage'
 
 function AppShell({ children }) {
@@ -49,10 +50,11 @@ function App() {
                   <Route path="/projects" element={<ProjectsPage />} />
                   <Route path="/upload" element={<UploadPage />} />
                   <Route path="/test-cases" element={<TestCasesPage />} />
+                  <Route path="/workflows" element={<WorkflowsPage />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/release-readiness" element={<ReleaseReadinessPage />} />
                   <Route path="/assistant" element={<AssistantPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
-                  <Route path="/release-readiness" element={<ReleaseReadinessPage />} />
                 </Routes>
               </AppShell>
             </RequireAuth>

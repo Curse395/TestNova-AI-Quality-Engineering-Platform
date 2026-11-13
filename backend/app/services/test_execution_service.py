@@ -8,8 +8,7 @@ import logging
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from sqlalchemy.orm import Session
-from app.models.organization import Organization
-from app.models.project import Project
+from app.core.authorization import get_owned_project
 from app.models.test_case import TestCase
 from app.models.test_execution import TestExecutionRun
 from app.schemas.test_execution_schema import APIRequestConfig
@@ -66,7 +65,7 @@ class TestExecutionService:
         project_id: int,
         test_case_id: int,
     ) -> TestCase:
-        project = (self.db.query(Project).join(Organization).filter(Project.id == project_id,Organization.owner_id == user_id).first())
+        project = get_owned_project(self.db, project_id, user_id)
 
         if project is None:
             raise ValueError("Project not found or access denied.")
@@ -376,7 +375,7 @@ class TestExecutionService:
     def get_execution_history(self,user_id:int,project_id:int,limit:int=20,offset:int=0)->dict[str,Any]:
         """return paginated execution history for an owned project"""
 
-        project=(self.db.query(Project).join(Organization).filter(Project.id==project_id,Organization.owner_id==user_id).first())
+        project = get_owned_project(self.db, project_id, user_id)
 
         if project is None:
             raise ValueError("Project could not be found or access deined")
@@ -416,7 +415,7 @@ class TestExecutionService:
     ) -> dict[str, Any]:
         """Return detailed execution data with its test case and evidence."""
 
-        project = (self.db.query(Project).join(Organization).filter(Project.id == project_id,Organization.owner_id == user_id).first())
+        project = get_owned_project(self.db, project_id, user_id)
     
         if project is None:
             raise ValueError("Project not found or access denied.")
