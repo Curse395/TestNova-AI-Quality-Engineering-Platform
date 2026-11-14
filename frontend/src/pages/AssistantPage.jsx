@@ -398,8 +398,8 @@ const AssistantPage = () => {
     p === 'High' ? 'text-rose-400 bg-rose-500/10' : p === 'Medium' ? 'text-amber-400 bg-amber-500/10' : 'text-sky-400 bg-sky-500/10'
 
   return (
-    <div className="overflow-hidden bg-[#020617] p-4 text-slate-100 lg:p-6" style={{ height: '100vh' }}>
-      <div className="mx-auto flex h-full max-w-7xl flex-col gap-6">
+    <div className="workspace-page assistant-page-shell bg-[var(--background)] text-slate-100">
+      <div className="assistant-page-content">
         <Navbar title="AI Assistant" subtitle="Copilot" />
 
         <div className="grid flex-1 gap-6 xl:grid-cols-[0.95fr_1.05fr]" style={{ minHeight: 0 }}>

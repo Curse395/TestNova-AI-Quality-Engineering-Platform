@@ -140,7 +140,7 @@ const AnalyticsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="Quality Analytics" subtitle="Project knowledge and test quality metrics" />
         {projects.length > 0 && (
@@ -194,7 +194,7 @@ const AnalyticsPage = () => {
                     return (
                       <div key={document.document_id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="break-all font-medium text-white">{document.filename}</p>
+                          <p className="break-all font-medium text-slate-100">{document.filename}</p>
                           <p className="text-sm text-slate-400">
                             {document.chunks ?? 'Unavailable'} chunks · {document.embeddings ?? 'Unavailable'} embeddings
                           </p>
@@ -407,7 +407,7 @@ const AnalyticsPage = () => {
                     {workflowMonitoring.workflows.map((workflow) => (
                       <section key={workflow.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="font-medium text-white">
+                          <h3 className="font-medium text-slate-100">
                             Workflow {workflow.id} · {workflow.workflow_type.replaceAll('_', ' ')}
                           </h3>
                           <span className="text-sm capitalize text-slate-300">{workflow.status.replaceAll('_', ' ')}</span>

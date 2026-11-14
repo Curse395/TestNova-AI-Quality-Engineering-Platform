@@ -2,9 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="theme-color" content="#f3f5f2" />
+    <meta name="description" content="TestNova AI — quality engineering workspace" />
+    <title>TestNova AI · Quality Engineering</title>
+    <script>
+      (() => {
+        const savedTheme = localStorage.getItem('testnova-theme')
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.dataset.theme =
+          savedTheme === 'light' || savedTheme === 'dark'
+            ? savedTheme
+            : systemPrefersDark ? 'dark' : 'light'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

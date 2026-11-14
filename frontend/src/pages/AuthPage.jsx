@@ -48,17 +48,17 @@ const AuthPage = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.2),_transparent_40%),linear-gradient(135deg,_#020617,_#111827)] px-4 py-10 text-slate-100">
+    <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10 text-slate-100">
       <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-800/80 bg-slate-900/80 shadow-2xl shadow-slate-950/60 backdrop-blur">
         <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
           <div className="bg-gradient-to-br from-sky-500/20 via-slate-900 to-slate-950 p-8 lg:p-12">
             <p className="text-sm uppercase tracking-[0.35em] text-sky-400">TestNova AI</p>
-            <h1 className="mt-4 text-4xl font-semibold text-white">Ship quality with AI-native confidence.</h1>
+            <h1 className="mt-4 text-4xl font-semibold text-slate-100">Ship quality with AI-native confidence.</h1>
             <p className="mt-4 max-w-md text-lg text-slate-400">
               Centralize release health, automate test insight, and keep every release moving.
             </p>
             <div className="mt-8 rounded-3xl border border-slate-700/70 bg-slate-950/60 p-5 text-sm text-slate-300">
-              <p className="font-semibold text-white">What teams love</p>
+              <p className="font-semibold text-slate-100">What teams love</p>
               <ul className="mt-3 space-y-2 text-slate-400">
                 <li>• Live quality landscape across every project</li>
                 <li>• AI-assisted issue triage and summaries</li>

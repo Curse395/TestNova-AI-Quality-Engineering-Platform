@@ -1,26 +1,81 @@
-import { Bell, Search, Sparkles } from 'lucide-react'
-import Button from '../ui/Button'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronRight, LogOut, Moon, Sun, UserRound } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useTheme } from '../../context/useTheme'
 
 const Navbar = ({ title, subtitle }) => {
+  const { theme, toggleTheme } = useTheme()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!profileOpen) return undefined
+
+    const closeOnOutsideClick = (event) => {
+      if (!profileRef.current?.contains(event.target)) setProfileOpen(false)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [profileOpen])
+
+  const handleSignOut = () => {
+    localStorage.removeItem('access_token')
+    navigate('/login', { replace: true })
+  }
+
   return (
-    <header className="flex items-center justify-between rounded-3xl border border-slate-800/80 bg-slate-900/70 px-5 py-4 shadow-[0_20px_45px_-25px_rgba(0,0,0,0.75)] backdrop-blur">
-      <div>
-        <p className="text-sm text-slate-400">{subtitle}</p>
-        <h1 className="text-xl font-semibold text-white">{title}</h1>
+    <header className="app-header">
+      <div className="app-header-copy">
+        <nav className="app-header-subtitle" aria-label="Breadcrumb">
+          <Link to="/" className="breadcrumb-link">Mission Control</Link>
+          <ChevronRight size={12} aria-hidden="true" />
+          <span>{subtitle || title}</span>
+        </nav>
+        <h1 className="app-header-title">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-3">
-        <label className="hidden items-center gap-2 rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-400 md:flex">
-          <Search size={16} />
-          <input placeholder="Search workspace" className="bg-transparent outline-none" />
-        </label>
-        <button className="rounded-2xl border border-slate-800 bg-slate-950/70 p-2 text-slate-300">
-          <Bell size={16} />
+      <div className="app-header-actions">
+        <button
+          type="button"
+          className="icon-action"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+          title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
+        >
+          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
-        <Button className="gap-2">
-          <Sparkles size={16} />
-          New run
-        </Button>
+        <div className="profile-menu" ref={profileRef}>
+          <button
+            type="button"
+            className="profile-action"
+            aria-label="Open profile menu"
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
+            aria-controls="profile-menu"
+            onClick={() => setProfileOpen((open) => !open)}
+          >
+            <UserRound size={17} aria-hidden="true" />
+          </button>
+          {profileOpen && (
+            <div className="profile-dropdown" id="profile-menu" role="menu" aria-label="Profile menu">
+              <p className="profile-menu-title">Account</p>
+              <p className="profile-menu-description">Signed in to TestNova AI</p>
+              <button type="button" className="profile-signout" role="menuitem" onClick={handleSignOut}>
+                <LogOut size={15} aria-hidden="true" />
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

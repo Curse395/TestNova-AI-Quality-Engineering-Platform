@@ -74,7 +74,7 @@ const ProjectsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="Projects" subtitle="Portfolio" />
         {error && <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
@@ -91,7 +91,7 @@ const ProjectsPage = () => {
                 {projects.map((project) => (
                   <div key={project.id} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                     <div>
-                      <p className="font-semibold text-white">{project.name}</p>
+                      <p className="font-semibold text-slate-100">{project.name}</p>
                       <p className="mt-1 text-sm text-slate-400">{project.description || 'No description'}</p>
                     </div>
                     <Button variant="ghost" onClick={() => handleDelete(project)}>Delete</Button>

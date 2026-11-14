@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Play, RotateCw } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../components/layout/Navbar'
 import Card from '../components/ui/Card'
 import { getApiErrorMessage } from '../api/client'
@@ -121,7 +121,7 @@ function TaskHistory({ workflow }) {
             <article key={task.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h5 className="font-medium text-white">{task.agent_name.replaceAll('_', ' ')}</h5>
+                  <h5 className="font-medium text-slate-100">{task.agent_name.replaceAll('_', ' ')}</h5>
                   <p className="mt-1 text-xs capitalize text-slate-500">
                     {task.task_type.replaceAll('_', ' ')} · {task.input_summary || 'Task-specific inputs'}
                   </p>
@@ -458,7 +458,7 @@ function OutputSummary({ workflow }) {
           {testCases.map((testCase) => (
             <article key={testCase.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
               <div className="flex flex-wrap justify-between gap-2">
-                <h5 className="font-medium text-white">{safeWorkflowText(testCase.title, 'Untitled test case')}</h5>
+                <h5 className="font-medium text-slate-100">{safeWorkflowText(testCase.title, 'Untitled test case')}</h5>
                 <span className="text-xs capitalize text-slate-400">
                   {[
                     testCase.test_type,
@@ -558,6 +558,11 @@ function OutputSummary({ workflow }) {
 }
 
 const WorkflowsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedProjectId = searchParams.get('project_id')
+  const initialProjectIdRef = useRef(
+    requestedProjectId || localStorage.getItem('testnova-active-project-id') || '',
+  )
   const [projects, setProjects] = useState([])
   const [projectId, setProjectId] = useState('')
   const [workflows, setWorkflows] = useState([])
@@ -654,7 +659,13 @@ const WorkflowsPage = () => {
     try {
       const items = await fetchProjects()
       setProjects(items)
-      setProjectId((current) => current || (items.length ? String(items[0].id) : ''))
+      setProjectId((current) => {
+        const requestedProject = items.find((item) => String(item.id) === initialProjectIdRef.current)
+        const storedProject = items.find(
+          (item) => String(item.id) === localStorage.getItem('testnova-active-project-id'),
+        )
+        return current || String(requestedProject?.id ?? storedProject?.id ?? items[0]?.id ?? '')
+      })
       setProjectsError('')
       setError('')
     } catch (requestError) {
@@ -665,6 +676,15 @@ const WorkflowsPage = () => {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (!projectId) return
+    localStorage.setItem('testnova-active-project-id', projectId)
+    if (searchParams.get('project_id') === projectId) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('project_id', projectId)
+    setSearchParams(nextParams, { replace: true })
+  }, [projectId, searchParams, setSearchParams])
 
   useEffect(() => {
     loadProjects()
@@ -798,7 +818,7 @@ const WorkflowsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="QA Workflows" subtitle="Run evidence-grounded analysis and review agent progress" />
         {error && (
@@ -967,7 +987,7 @@ const WorkflowsPage = () => {
                   <summary className="cursor-pointer list-none">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <h3 className="font-semibold capitalize text-white">{(workflow.workflow_type || 'workflow').replaceAll('_', ' ')}</h3>
+                        <h3 className="font-semibold capitalize text-slate-100">{(workflow.workflow_type || 'workflow').replaceAll('_', ' ')}</h3>
                         <p className="mt-1 text-xs text-slate-500">
                           Run #{workflow.id} · Created {formatTimestamp(workflow.created_at)}
                         </p>

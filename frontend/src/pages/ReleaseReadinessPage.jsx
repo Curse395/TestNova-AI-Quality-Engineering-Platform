@@ -140,7 +140,7 @@ export default function ReleaseReadinessPage() {
   const assessment = data?.assessment
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.12),_transparent_30%),#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar
           title="Release Readiness"

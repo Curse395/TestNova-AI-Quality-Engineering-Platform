@@ -1,6 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import { Activity, Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, LogOut, ShieldCheck, Upload } from 'lucide-react'
-import Button from '../ui/Button'
+import { NavLink } from 'react-router-dom'
+import { Activity, Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, ShieldCheck, Upload } from 'lucide-react'
 import { navItems } from '../../data/navigation'
 
 const icons = {
@@ -15,21 +14,19 @@ const icons = {
 }
 
 const Sidebar = () => {
-  const navigate = useNavigate()
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token')
-    navigate('/login', { replace: true })
-  }
-
   return (
-    <aside className="hidden w-72 flex-col border-r border-slate-800/80 bg-slate-950/80 px-6 py-8 lg:flex">
-      <div className="mb-10">
-        <p className="text-sm uppercase tracking-[0.35em] text-sky-400">TestNova AI</p>
-        <h2 className="mt-2 text-2xl font-semibold text-white">Quality Engineering</h2>
+    <aside className="app-sidebar" aria-label="Primary navigation">
+      <div className="sidebar-brand">
+        <div className="brand-mark" aria-hidden="true">
+          <Activity size={20} strokeWidth={2.2} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold tracking-tight text-slate-100">TestNova <span className="text-sky-500">AI</span></p>
+          <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-400">Quality workspace</p>
+        </div>
       </div>
 
-      <nav className="space-y-2">
+      <nav className="sidebar-nav">
         {navItems.map((item) => {
           const Icon = icons[item.icon]
           return (
@@ -37,29 +34,21 @@ const Sidebar = () => {
               key={item.href}
               to={item.href}
               end={item.href === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-slate-800 text-white shadow-lg shadow-slate-900/40'
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
-                }`
-              }
+              className="sidebar-link"
+              title={item.label}
+              aria-label={item.label}
             >
-              <Icon size={18} />
-              {item.label}
+              <Icon size={17} aria-hidden="true" />
+              <span className="sidebar-label">{item.label}</span>
             </NavLink>
           )
         })}
       </nav>
 
-      <div className="mt-auto rounded-3xl border border-sky-500/20 bg-sky-500/10 p-4">
-        <p className="text-sm font-semibold text-sky-200">Workspace insights</p>
-        <p className="mt-1 text-sm text-slate-400">Review document processing and embedding health.</p>
+      <div className="sidebar-footer">
+        <p className="text-xs font-medium text-slate-400">Project-scoped intelligence</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Evidence, test generation and execution in one workspace.</p>
       </div>
-      <Button variant="ghost" className="mt-4 justify-start gap-3" onClick={handleLogout}>
-        <LogOut size={18} />
-        Sign out
-      </Button>
     </aside>
   )
 }

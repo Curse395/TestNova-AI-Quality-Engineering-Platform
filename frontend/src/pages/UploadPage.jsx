@@ -136,7 +136,7 @@ const UploadPage = () => {
       : 'text-amber-400'
 
   return (
-    <div className="min-h-screen bg-[#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="Upload Center" subtitle="Project knowledge" />
         {error && <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
@@ -186,7 +186,7 @@ const UploadPage = () => {
                   </select>
                 </label>
                 <label className="block rounded-3xl border border-dashed border-slate-700 bg-slate-950/70 p-8 text-center">
-                  <span className="block text-lg font-semibold text-white">Choose a project document</span>
+                  <span className="block text-lg font-semibold text-slate-100">Choose a project document</span>
                   <span className="mt-2 block text-sm text-slate-400">File size limit is configured by the server.</span>
                   <input
                     className="mt-5 block w-full text-sm text-slate-300"
@@ -214,7 +214,7 @@ const UploadPage = () => {
                   <div key={document.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="break-all font-medium text-white">{document.filename}</p>
+                        <p className="break-all font-medium text-slate-100">{document.filename}</p>
                         <p className="mt-1 text-xs text-slate-500">
                           {document.source_type?.replaceAll('_', ' ')} · {document.content_type}
                         </p>
@@ -268,7 +268,7 @@ const UploadPage = () => {
             aria-describedby="delete-document-description"
             className="w-full max-w-lg rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl shadow-black/50"
           >
-            <h2 id="delete-document-title" className="text-xl font-semibold text-white">
+            <h2 id="delete-document-title" className="text-xl font-semibold text-slate-100">
               Delete document?
             </h2>
             <p className="mt-3 break-all font-medium text-slate-200">

@@ -275,7 +275,7 @@ const TestCasesPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] p-4 text-slate-100 lg:p-6">
+    <div className="workspace-page min-h-screen bg-[var(--background)] p-4 text-slate-100 lg:p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <Navbar title="Test Cases" subtitle="Review generated cases and source evidence" />
         {error && <p role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</p>}
@@ -309,7 +309,7 @@ const TestCasesPage = () => {
                   <article key={run.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="font-medium text-white">Run #{run.id}</h2>
+                        <h2 className="font-medium text-slate-100">Run #{run.id}</h2>
                         <p className="mt-1 text-xs text-slate-400">
                           {run.generation_status || run.status || 'unknown'} · {run.created_at ? new Date(run.created_at).toLocaleString() : 'date unavailable'}
                         </p>
@@ -369,7 +369,7 @@ const TestCasesPage = () => {
                 <article key={testCase.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h2 className="font-semibold text-white">{testCase.title}</h2>
+                      <h2 className="font-semibold text-slate-100">{testCase.title}</h2>
                       {(testCase.test_type || testCase.category || testCase.priority || testCase.severity || testCase.review_status) && (
                         <p className="mt-1 text-xs capitalize text-slate-400">
                           {[
@@ -474,7 +474,7 @@ const TestCasesPage = () => {
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-sky-300">Test case #{selectedCase.id}</p>
-                  <h2 id="test-case-detail-title" className="mt-1 text-xl font-semibold text-white">
+                  <h2 id="test-case-detail-title" className="mt-1 text-xl font-semibold text-slate-100">
                     {selectedCase.title}
                   </h2>
                 </div>
