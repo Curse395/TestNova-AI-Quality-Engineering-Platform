@@ -149,6 +149,88 @@ const SourceCitation = ({ sources }) => {
   )
 }
 
+function IntelligenceSummary({ intelligence }) {
+  if (!intelligence || typeof intelligence !== 'object') return null
+
+  if (intelligence.kind === 'structured_project_data' && intelligence.data?.documents) {
+    const records = intelligence.data.documents.records
+    return (
+      <div className="mt-3 overflow-x-auto rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+          Calculated from project data
+        </p>
+        {Array.isArray(records) && records.length > 0 ? (
+          <table className="min-w-full text-left text-xs text-slate-300">
+            <caption className="sr-only">Document embedding record and chunk counts</caption>
+            <thead className="text-slate-500">
+              <tr>
+                <th scope="col" className="py-1 pr-4">Document</th>
+                <th scope="col" className="py-1 pr-4">Embedding records</th>
+                <th scope="col" className="py-1 pr-4">Chunks</th>
+                <th scope="col" className="py-1">Processing</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record) => (
+                <tr key={record.document_id} className="border-t border-slate-800">
+                  <th scope="row" className="py-2 pr-4 font-medium text-slate-200">
+                    {record.filename}
+                  </th>
+                  <td className="py-2 pr-4">{record.embeddings}</td>
+                  <td className="py-2 pr-4">{record.chunks}</td>
+                  <td className="py-2">{record.processing_status || 'Not reported'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="text-xs text-slate-400">No document records are available.</p>
+        )}
+      </div>
+    )
+  }
+
+  if (intelligence.kind === 'retrieval_similarity') {
+    return (
+      <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-300">
+          Retrieved similarity scores
+        </p>
+        <ul className="space-y-1 text-xs text-slate-300">
+          {(intelligence.records || []).map((record) => (
+            <li key={`${record.document_name}-${record.chunk_id}`}>
+              {record.document_name} · Chunk #{record.chunk_id} · Similarity: {record.similarity.toFixed(3)}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  if (intelligence.kind === 'structured_project_data') {
+    return (
+      <p className="mt-3 text-xs font-medium text-emerald-300">
+        Calculated from authenticated project data
+      </p>
+    )
+  }
+  if (intelligence.kind === 'structured_project_data_and_retrieval') {
+    return (
+      <p className="mt-3 text-xs font-medium text-emerald-300">
+        Answer uses calculated project data and retrieved document evidence
+      </p>
+    )
+  }
+  if (intelligence.kind === 'platform_architecture') {
+    return (
+      <p className="mt-3 text-xs font-medium text-violet-300">
+        Based on approved, statically inspected TestNova source files
+      </p>
+    )
+  }
+  return null
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -336,6 +418,7 @@ const AssistantPage = () => {
             role: 'assistant',
             text: res.answer || 'No answer was returned.',
             sources: res.sources || [],
+            intelligence: res.intelligence,
           },
         ])
       }
@@ -511,6 +594,7 @@ const AssistantPage = () => {
                       {msg.role === 'user' ? 'You' : 'Assistant'}
                     </p>
                     <p className="whitespace-pre-wrap">{msg.text}</p>
+                    {msg.role === 'assistant' && <IntelligenceSummary intelligence={msg.intelligence} />}
                     {msg.role === 'assistant' && <SourceCitation sources={msg.sources} />}
                   </div>
                 ))
