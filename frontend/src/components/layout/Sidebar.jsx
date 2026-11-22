@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { Activity, Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, ShieldCheck, Upload } from 'lucide-react'
+import { Activity, ArrowUpRight, Bot, BarChart3, ClipboardCheck, FolderKanban, LayoutGrid, ShieldCheck, Upload } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { navItems } from '../../data/navigation'
 
 const icons = {
@@ -22,11 +23,12 @@ const Sidebar = () => {
         </div>
         <div>
           <p className="text-sm font-semibold tracking-tight text-slate-100">TestNova <span className="text-sky-500">AI</span></p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-400">Quality workspace</p>
+          <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-slate-400">Agentic quality system</p>
         </div>
       </div>
 
       <nav className="sidebar-nav">
+        <p className="sidebar-section-label">Workspace</p>
         {navItems.map((item) => {
           const Icon = icons[item.icon]
           return (
@@ -46,8 +48,13 @@ const Sidebar = () => {
       </nav>
 
       <div className="sidebar-footer">
-        <p className="text-xs font-medium text-slate-400">Project-scoped intelligence</p>
-        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Evidence, test generation and execution in one workspace.</p>
+        <p className="text-xs font-medium text-slate-400">Connected quality loop</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">Evidence, agents and release signals stay in context.</p>
+        <Link to="/assistant" className="sidebar-assistant-link">
+          <span className="sidebar-assistant-icon"><Bot size={15} aria-hidden="true" /></span>
+          <span>Ask the AI assistant</span>
+          <ArrowUpRight size={14} aria-hidden="true" />
+        </Link>
       </div>
     </aside>
   )

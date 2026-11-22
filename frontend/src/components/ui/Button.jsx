@@ -7,7 +7,7 @@ const Button = ({ children, variant = 'primary', className = '', ...props }) => 
   }
 
   return (
-    <button className={`${base} ${variants[variant]} ${className}`} {...props}>
+    <button className={`ui-button ${base} ${variants[variant]} ${className}`} data-variant={variant} {...props}>
       {children}
     </button>
   )

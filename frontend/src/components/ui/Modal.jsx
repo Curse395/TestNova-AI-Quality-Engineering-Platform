@@ -31,7 +31,7 @@ const Modal = ({ open, onClose, title, subtitle, children, footer }) => {
       aria-label={title}
     >
       <div
-        className="my-auto w-full max-w-2xl rounded-3xl border border-slate-800/80 bg-slate-900/90 shadow-2xl shadow-slate-950/70 backdrop-blur"
+        className="modal-panel my-auto w-full max-w-2xl rounded-3xl border border-slate-800/80 shadow-2xl shadow-slate-950/70"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-800/80 px-6 py-5">

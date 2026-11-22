@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, LogOut, Moon, Sun, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../../context/useTheme'
+import { clearDashboardCache } from '../../api/dashboard'
 
 const Navbar = ({ title, subtitle }) => {
   const { theme, toggleTheme } = useTheme()
@@ -29,6 +30,7 @@ const Navbar = ({ title, subtitle }) => {
 
   const handleSignOut = () => {
     localStorage.removeItem('access_token')
+    clearDashboardCache()
     navigate('/login', { replace: true })
   }
 
@@ -36,7 +38,7 @@ const Navbar = ({ title, subtitle }) => {
     <header className="app-header">
       <div className="app-header-copy">
         <nav className="app-header-subtitle" aria-label="Breadcrumb">
-          <Link to="/" className="breadcrumb-link">Mission Control</Link>
+          <Link to="/" className="breadcrumb-link">TestNova AI</Link>
           <ChevronRight size={12} aria-hidden="true" />
           <span>{subtitle || title}</span>
         </nav>

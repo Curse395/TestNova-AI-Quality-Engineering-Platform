@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Activity, ArrowRight, GitBranch, ShieldCheck, Sparkles } from 'lucide-react'
 import Button from '../components/ui/Button'
 import FormField from '../components/ui/FormField'
 import { apiClient, getApiErrorMessage } from '../api/client'
+import { clearDashboardCache } from '../api/dashboard'
 
 const AuthPage = () => {
   const [mode, setMode] = useState('login')
@@ -35,6 +37,7 @@ const AuthPage = () => {
       }
       const token = res.data.access_token || res.data?.data?.access_token
       if (token) {
+        clearDashboardCache()
         localStorage.setItem('access_token', token)
       } else {
         throw new Error('Authentication response did not contain an access token.')
@@ -49,41 +52,74 @@ const AuthPage = () => {
 
   return (
     <div className="auth-page flex min-h-screen items-center justify-center px-4 py-10 text-slate-100">
-      <div className="w-full max-w-5xl overflow-hidden rounded-[32px] border border-slate-800/80 bg-slate-900/80 shadow-2xl shadow-slate-950/60 backdrop-blur">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="bg-gradient-to-br from-sky-500/20 via-slate-900 to-slate-950 p-8 lg:p-12">
-            <p className="text-sm uppercase tracking-[0.35em] text-sky-400">TestNova AI</p>
-            <h1 className="mt-4 text-4xl font-semibold text-slate-100">Ship quality with AI-native confidence.</h1>
-            <p className="mt-4 max-w-md text-lg text-slate-400">
-              Centralize release health, automate test insight, and keep every release moving.
-            </p>
-            <div className="mt-8 rounded-3xl border border-slate-700/70 bg-slate-950/60 p-5 text-sm text-slate-300">
-              <p className="font-semibold text-slate-100">What teams love</p>
-              <ul className="mt-3 space-y-2 text-slate-400">
-                <li>• Live quality landscape across every project</li>
-                <li>• AI-assisted issue triage and summaries</li>
-                <li>• One-click upload and artifact intelligence</li>
-              </ul>
+      <div className="auth-frame">
+        <section className="auth-story" aria-labelledby="auth-story-heading">
+          <div className="auth-story-topline">
+            <div className="brand-mark" aria-hidden="true"><Activity size={19} /></div>
+            <span>TestNova <span className="text-sky-500">AI</span></span>
+            <span className="auth-story-divider" />
+            <span className="auth-story-caption">Agentic quality system</span>
+          </div>
+
+          <div className="auth-story-copy">
+            <p className="mission-kicker"><Sparkles size={13} /> Quality, in motion</p>
+            <h1 id="auth-story-heading">Let your QA agents do the heavy lifting.</h1>
+            <p>One connected system to turn product evidence into tested changes and release confidence.</p>
+          </div>
+
+          <div className="auth-agent-loop" aria-label="Agent workflow: understand, validate, and report">
+            <div className="auth-loop-heading">
+              <span>THE QUALITY LOOP</span>
+              <span>Evidence to confidence</span>
+            </div>
+            <div className="auth-loop-steps">
+              <div className="auth-loop-step">
+                <span className="auth-loop-icon"><GitBranch size={16} /></span>
+                <span><strong>Understand</strong><small>Product context</small></span>
+              </div>
+              <span className="auth-loop-connector" aria-hidden="true" />
+              <div className="auth-loop-step">
+                <span className="auth-loop-icon"><Activity size={16} /></span>
+                <span><strong>Validate</strong><small>Agent workflows</small></span>
+              </div>
+              <span className="auth-loop-connector" aria-hidden="true" />
+              <div className="auth-loop-step">
+                <span className="auth-loop-icon"><ShieldCheck size={16} /></span>
+                <span><strong>Decide</strong><small>Release readiness</small></span>
+              </div>
             </div>
           </div>
 
-          <div className="p-8 lg:p-12">
-            <div className="flex rounded-2xl border border-slate-800 bg-slate-950/70 p-1">
+          <p className="auth-story-footnote">Every decision stays connected to its evidence.</p>
+        </section>
+
+        <section className="auth-form-panel" aria-label={mode === 'login' ? 'Sign in' : 'Create account'}>
+            <div className="auth-form-heading">
+              <p className="auth-form-eyebrow">YOUR WORKSPACE</p>
+              <h2>{mode === 'login' ? 'Welcome back' : 'Create your workspace'}</h2>
+              <p>{mode === 'login' ? 'Pick up where your quality workflow left off.' : 'Bring your team and quality workflows together.'}</p>
+            </div>
+
+            <div className="auth-mode-switch" role="group" aria-label="Account action">
               <button
-                className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
+                type="button"
+                aria-pressed={mode === 'login'}
+                className={`auth-mode-button ${mode === 'login' ? 'is-active' : ''}`}
                 onClick={() => { setMode('login'); setError('') }}
               >
                 Sign in
               </button>
               <button
-                className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-sky-500 text-white' : 'text-slate-400'}`}
+                type="button"
+                aria-pressed={mode === 'register'}
+                className={`auth-mode-button ${mode === 'register' ? 'is-active' : ''}`}
                 onClick={() => { setMode('register'); setError('') }}
               >
                 Create account
               </button>
             </div>
 
-            <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
+            <form className="auth-form" onSubmit={handleSubmit}>
               {mode === 'register' && (
                 <>
                   <FormField label="Full name" name="name" placeholder="Jordan Lee" value={form.name} onChange={handleChange} required />
@@ -92,24 +128,15 @@ const AuthPage = () => {
               )}
               <FormField label="Email" type="email" name="email" placeholder="you@company.com" value={form.email} onChange={handleChange} required />
               <FormField label="Password" type="password" name="password" placeholder="••••••••" value={form.password} onChange={handleChange} required />
-              {error && <p className="text-sm text-rose-400">{error}</p>}
-              <Button className="w-full py-3" disabled={submitting}>
-                {submitting ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
+              {error && <p className="auth-error" role="alert">{error}</p>}
+              <Button className="auth-submit w-full py-3" disabled={submitting}>
+                <span>{submitting ? 'Please wait…' : mode === 'login' ? 'Sign in to TestNova' : 'Create workspace'}</span>
+                {!submitting && <ArrowRight size={16} aria-hidden="true" />}
               </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-slate-500">
-              {mode === 'login' ? 'Need a workspace?' : 'Already have an account?'}{' '}
-              <button
-                type="button"
-                className="text-sky-400"
-                onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}
-              >
-                {mode === 'login' ? 'Create an account' : 'Sign in'}
-              </button>
-            </p>
-          </div>
-        </div>
+            <p className="auth-form-footnote">Secure access to your quality workspace.</p>
+        </section>
       </div>
     </div>
   )
