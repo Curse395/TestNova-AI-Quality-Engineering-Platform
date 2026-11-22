@@ -375,6 +375,8 @@ class AnalyticsService:
                     "filename": document.filename,
                     "chunks": chunk_count,
                     "embeddings": embedding_count,
+                    "processing_status": document.processing_status,
+                    "source_type": document.source_type,
                 }
             )
 

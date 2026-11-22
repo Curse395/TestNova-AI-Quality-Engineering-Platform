@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Literal
 
@@ -14,6 +15,12 @@ from app.services.project_intelligence_service import ProjectIntelligenceService
 from app.services.release_readiness_service import ReleaseReadinessService
 
 router=APIRouter(prefix="/analytics",tags=["Analytics"])
+logger = logging.getLogger(__name__)
+_QUALITY_SUMMARY_FAILURE_CATEGORIES = {
+    "llm_response_failed",
+    "structured_output_invalid",
+    "evidence_reference_invalid",
+}
 
 
 def _raise_analytics_error(exc: ValueError) -> None:
@@ -178,10 +185,26 @@ def generate_quality_summary(
     db: Session = Depends(get_db),
 ):
     try:
-        return ProjectIntelligenceService(db).generate_quality_summary(
+        result = ProjectIntelligenceService(db).generate_quality_summary(
             project_id=project_id,
             current_user_id=current_user.id,
         )
+        status = result.get("status")
+        failure_category = result.pop("_failure_category", None)
+        if status == "unavailable":
+            safe_failure_category = (
+                failure_category
+                if isinstance(failure_category, str)
+                and failure_category in _QUALITY_SUMMARY_FAILURE_CATEGORIES
+                else "unclassified"
+            )
+            logger.warning(
+                "Quality summary API result: project_id=%s status=%s failure_category=%s",
+                project_id,
+                status,
+                safe_failure_category,
+            )
+        return result
     except ValueError as exc:
         _raise_analytics_error(exc)
 

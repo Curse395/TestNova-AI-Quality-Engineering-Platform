@@ -47,6 +47,13 @@ def _safe_text(value: object, limit: int = 1000) -> str:
     return flattened[:limit]
 
 
+def _safe_log_token(value: object, limit: int = 100) -> str:
+    sanitized = _safe_text(value, limit)
+    if sanitized and re.fullmatch(r"[A-Za-z0-9_.:/-]+", sanitized):
+        return sanitized
+    return "unavailable"
+
+
 def _safe_error(error: object) -> dict[str, str] | None:
     if not isinstance(error, dict):
         return None
@@ -594,7 +601,19 @@ class ProjectIntelligenceService:
             "of complete testing. State missing evidence explicitly. Do not invent "
             "defects, risks, requirements, behavior, or test results. Never provide "
             "a release-readiness verdict, confidence score, or production-ready claim. "
-            "Recommended actions must be framed as suggestions, not facts.\n\n"
+            "Recommended actions must be framed as suggestions, not facts.\n"
+            "Output-shape requirements: include every property required by the JSON "
+            "Schema exactly once. overall_summary must be one SummaryStatement "
+            "object. testing_activity, test_case_quality, requirement_traceability, "
+            "execution_trends, significant_failures, identified_risks, "
+            "missing_evidence, recommended_actions, and limitations must each be "
+            "JSON arrays of SummaryStatement objects. When a section has no "
+            "evidence-supported statements, return an empty array [] for that "
+            "section. Never return null, a string, or a single object for an array "
+            "field, and never omit a required field. Each SummaryStatement must "
+            "contain a non-empty statement, a non-empty evidence_ids array containing "
+            "only supplied evidence IDs, and an interpretation boolean. Do not add "
+            "placeholder statements or evidence IDs.\n\n"
             "JSON Schema:\n"
             + json.dumps(QualitySummaryContent.model_json_schema(), sort_keys=True)
         )
@@ -613,34 +632,126 @@ class ProjectIntelligenceService:
             user_prompt=user_prompt,
             response_mime_type="application/json",
         )
-        if not response.get("success") or not isinstance(response.get("answer"), str):
+        answer = response.get("answer")
+        if (
+            not response.get("success")
+            or not isinstance(answer, str)
+            or not answer.strip()
+        ):
+            if not response.get("success"):
+                response_state = "unsuccessful_response"
+            elif not isinstance(answer, str):
+                response_state = "answer_not_text"
+            else:
+                response_state = "empty_answer"
+            failure_category = "llm_response_failed"
             logger.warning(
-                "Quality summary generation returned an unsuccessful LLM response for project_id=%s",
+                "Quality summary unavailable: diagnostic=llm_response project_id=%s failure_category=%s response_state=%s provider=%s model=%s stage=%s error_category=%s error_type=%s fallback_attempted=%s",
                 project_id,
+                failure_category,
+                response_state,
+                _safe_log_token(response.get("provider")),
+                _safe_log_token(response.get("model")),
+                _safe_log_token(response.get("stage")),
+                _safe_log_token(response.get("error_category")),
+                _safe_log_token(response.get("error_type")),
+                response.get("fallback_attempted") is True,
             )
-            return self._summary_unavailable(project_id, sources, fingerprint)
+            return self._summary_unavailable(
+                project_id,
+                sources,
+                fingerprint,
+                failure_category,
+            )
         validated = validate_structured_output(
-            response["answer"],
+            answer,
             QualitySummaryContent,
         )
         if not validated.success or validated.value is None:
-            logger.warning(
-                "Quality summary response failed structured validation for project_id=%s",
-                project_id,
+            validation_errors = (
+                validated.error.details.get("validation_errors", [])
+                if validated.error is not None and isinstance(validated.error.details, dict)
+                else []
             )
-            return self._summary_unavailable(project_id, sources, fingerprint)
+            if not isinstance(validation_errors, list):
+                validation_errors = []
+            allowed_fields = set(QualitySummaryContent.model_fields)
+            validation_fields: set[str] = set()
+            validation_codes: set[str] = set()
+            for item in validation_errors:
+                if not isinstance(item, dict):
+                    continue
+                path = item.get("path")
+                if isinstance(path, str):
+                    root_field = path.split(".", 1)[0]
+                    validation_fields.add(
+                        root_field if root_field in allowed_fields else "other"
+                    )
+                code = item.get("code")
+                if isinstance(code, str) and re.fullmatch(r"[a-z0-9_]{1,80}", code):
+                    validation_codes.add(code)
+            failure_category = "structured_output_invalid"
+            logger.warning(
+                "Quality summary unavailable: diagnostic=structured_output_validation project_id=%s failure_category=%s error_category=%s error_stage=%s validation_error_count=%s validation_fields=%s validation_codes=%s",
+                project_id,
+                failure_category,
+                _safe_log_token(validated.error.category.value if validated.error else None),
+                _safe_log_token(validated.error.stage if validated.error else None),
+                len(validation_errors),
+                ",".join(sorted(validation_fields)) or "unavailable",
+                ",".join(sorted(validation_codes)) or "unavailable",
+            )
+            return self._summary_unavailable(
+                project_id,
+                sources,
+                fingerprint,
+                failure_category,
+            )
         safe_summary = self.sanitize_summary(validated.value)
+        allowed_evidence_ids = {source["id"] for source in sources}
         try:
             self.validate_summary_references(
                 safe_summary,
-                {source["id"] for source in sources},
+                allowed_evidence_ids,
             )
-        except ValueError:
+        except ValueError as exc:
+            summary_statements = [safe_summary.overall_summary]
+            for field_name in (
+                "testing_activity",
+                "test_case_quality",
+                "requirement_traceability",
+                "execution_trends",
+                "significant_failures",
+                "identified_risks",
+                "missing_evidence",
+                "recommended_actions",
+                "limitations",
+            ):
+                summary_statements.extend(getattr(safe_summary, field_name))
+            invalid_reference_count = len(
+                {
+                    evidence_id
+                    for statement in summary_statements
+                    for evidence_id in statement.evidence_ids
+                    if evidence_id not in allowed_evidence_ids
+                }
+            )
+            failure_category = "evidence_reference_invalid"
             logger.warning(
-                "Quality summary referenced evidence outside the supplied project data for project_id=%s",
+                "Quality summary unavailable: diagnostic=evidence_reference_validation project_id=%s failure_category=%s error_type=%s error=%s invalid_reference_count=%s allowed_evidence_count=%s",
                 project_id,
+                failure_category,
+                type(exc).__name__,
+                _safe_text(str(exc), 200) or "validation failed",
+                invalid_reference_count,
+                len(allowed_evidence_ids),
             )
-            return self._summary_unavailable(project_id, sources, fingerprint)
+            return self._summary_unavailable(
+                project_id,
+                sources,
+                fingerprint,
+                failure_category,
+            )
         response_data = {
             "project_id": project_id,
             "status": "available",
@@ -670,6 +781,7 @@ class ProjectIntelligenceService:
         project_id: int,
         sources: list[dict[str, str]],
         fingerprint: str,
+        failure_category: str,
     ) -> dict[str, Any]:
         return {
             "project_id": project_id,
@@ -684,6 +796,7 @@ class ProjectIntelligenceService:
                 "No summary claims or release-readiness conclusions are available.",
             ],
             "error": "Quality summary is temporarily unavailable.",
+            "_failure_category": failure_category,
         }
 
 

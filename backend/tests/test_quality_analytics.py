@@ -296,11 +296,11 @@ def test_trend_pass_rate_excludes_error_skipped_other_missing_and_blank():
 class _AuthorizationQuery:
     def __init__(self, project):
         self.project = project
-        self.joined = False
+        self.joins = []
         self.filters = []
 
-    def join(self, model):
-        self.joined = model is Organization
+    def join(self, model, onclause=None):
+        self.joins.append((model, onclause))
         return self
 
     def filter(self, *conditions):
@@ -344,7 +344,10 @@ def test_analytics_service_enforces_project_owner_scope_before_aggregation(
         )
 
     assert db.queried_model is Project
-    assert db.query_result.joined
+    assert len(db.query_result.joins) == 1
+    joined_model, onclause = db.query_result.joins[0]
+    assert joined_model is Organization
+    assert onclause.compare(Project.organitzation_id == Organization.id)
     assert len(db.query_result.filters) == 2
 
 

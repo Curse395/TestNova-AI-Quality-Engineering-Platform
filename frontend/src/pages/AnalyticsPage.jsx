@@ -4,9 +4,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,24 +16,15 @@ import {
   fetchProjects,
   generateProjectQualitySummary,
 } from '../api/projects'
-
-const STATUS_COLORS = {
-  passed: '#34d399',
-  failed: '#fb7185',
-  error: '#f97316',
-  skipped: '#fbbf24',
-  other: '#a78bfa',
-  missing: '#94a3b8',
-  blank: '#64748b',
-}
+import {
+  reviewStatusDistributionData,
+  testCaseDistributionData,
+} from './testCasePresentation'
+import { potentialImpactHighlights } from './riskImpactPresentation'
 
 const AnalyticsPage = () => {
   const [projects, setProjects] = useState([])
   const [projectId, setProjectId] = useState('')
-  const [trendBucket, setTrendBucket] = useState('day')
-  const [trendFromDate, setTrendFromDate] = useState('')
-  const [trendThroughDate, setTrendThroughDate] = useState('')
-  const [appliedTrendRange, setAppliedTrendRange] = useState(null)
   const [analytics, setAnalytics] = useState(null)
   const [qualitySummary, setQualitySummary] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
@@ -72,11 +60,7 @@ const AnalyticsPage = () => {
 
     let active = true
     setLoading(true)
-    fetchProjectAnalytics(
-      Number(projectId),
-      trendBucket,
-      appliedTrendRange || {},
-    )
+    fetchProjectAnalytics(Number(projectId))
       .then((data) => {
         if (active) {
           setAnalytics(data)
@@ -91,27 +75,22 @@ const AnalyticsPage = () => {
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [projectId, trendBucket, appliedTrendRange, navigate])
+  }, [projectId, navigate])
 
   const overview = analytics?.overview
   const testCases = analytics?.testCases
   const coverage = analytics?.coverage
-  const executions = analytics?.executions
-  const executionTrends = analytics?.executionTrends
   const risks = analytics?.risks
   const workflowMonitoring = analytics?.workflowMonitoring
   const rows = analytics
     ? (Array.isArray(analytics.documents) ? analytics.documents : null)
     : null
-  const caseCategoryData = distributionData(testCases?.category_counts)
-  const casePriorityData = distributionData(testCases?.priority_counts)
-  const caseReviewData = distributionData(testCases?.review_status_counts)
-  const executionStatusData = distributionData(executions?.status_counts)
-  const trendBuckets = Array.isArray(executionTrends?.buckets)
-    ? executionTrends.buckets
-    : []
+  const caseCategoryData = testCaseDistributionData(testCases?.category_counts, 'category')
+  const casePriorityData = testCaseDistributionData(testCases?.priority_counts, 'priority')
+  const caseReviewData = reviewStatusDistributionData(testCases?.review_status_counts)
   const riskSeverityData = distributionData(risks?.severity_counts)
-  const riskCategoryData = distributionData(risks?.category_counts)
+    .filter(({ name, value }) => name !== 'unclassified' || Number(value) !== 0)
+  const impactHighlights = potentialImpactHighlights(risks?.risks)
 
   async function handleGenerateSummary() {
     if (!projectId || summaryLoading) return
@@ -222,9 +201,15 @@ const AnalyticsPage = () => {
                       <p className="text-sm text-slate-400">No test cases are recorded for this project.</p>
                     ) : (
                       <>
-                        <DistributionChart title="Cases by category" data={caseCategoryData} valueLabel="Test cases" />
-                        <DistributionChart title="Cases by priority" data={casePriorityData} valueLabel="Test cases" />
-                        <DistributionChart title="Cases by review status" data={caseReviewData} valueLabel="Test cases" />
+                        <DistributionChart title="Cases by category" data={caseCategoryData} valueLabel="Test cases" normalizeCategoryAxis />
+                        <DistributionChart title="Cases by priority" data={casePriorityData} valueLabel="Test cases" normalizeCategoryAxis />
+                        <DistributionChart
+                          title="Cases by review status"
+                          data={caseReviewData}
+                          valueLabel="Test cases"
+                          showPercentages
+                          normalizeCategoryAxis
+                        />
                       </>
                     )}
                   </div>
@@ -249,84 +234,6 @@ const AnalyticsPage = () => {
               </Card>
             )}
 
-            {executions && (
-              <Card
-                title="Test execution summary"
-                subtitle={`${executions.from ? `Filtered from ${formatBucketDate(executions.from)} to ${formatBucketDate(executions.to)} (UTC); ` : 'Lifetime totals; '}each persisted execution run is counted, including repeated runs of a test case.`}
-              >
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <Metric title="Execution runs" value={executions.total_runs} />
-                  <Metric title="Average valid duration" value={executions.duration.average_ms} suffix=" ms" />
-                  <Metric title="Median valid duration" value={executions.duration.median_ms} suffix=" ms" />
-                  <Metric title="Valid duration observations" value={executions.duration.observed_run_count} />
-                  <Metric title="Unavailable/invalid durations" value={executions.duration.unavailable_run_count} />
-                </div>
-                <div className="mt-6">
-                  {executions.total_runs === 0 ? (
-                    <p className="text-sm text-slate-400">No execution runs are recorded for this project in this period.</p>
-                  ) : (
-                    <DistributionChart title="Execution runs by status" data={executionStatusData} valueLabel="Execution runs" />
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {executionTrends && (
-              <Card title="Execution trends" subtitle={`Execution runs grouped by ${trendBucket}; buckets use UTC execution timestamps.`}>
-                <label className="mb-5 block max-w-xs text-sm text-slate-400">
-                  Time bucket
-                  <select
-                    value={trendBucket}
-                    onChange={(event) => setTrendBucket(event.target.value)}
-                    className="mt-2 block w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-slate-100"
-                  >
-                    <option value="day">Daily</option>
-                    <option value="week">Weekly (Monday start)</option>
-                    <option value="month">Monthly</option>
-                  </select>
-                </label>
-                <div className="mb-5 flex flex-wrap items-end gap-3">
-                  <label className="text-sm text-slate-400">
-                    Start date (UTC, inclusive; applies to execution summary and trends)
-                    <input
-                      type="date"
-                      value={trendFromDate}
-                      onChange={(event) => setTrendFromDate(event.target.value)}
-                      className="mt-2 block rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-slate-100"
-                    />
-                  </label>
-                  <label className="text-sm text-slate-400">
-                    Through date (UTC, inclusive)
-                    <input
-                      type="date"
-                      value={trendThroughDate}
-                      onChange={(event) => setTrendThroughDate(event.target.value)}
-                      className="mt-2 block rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-slate-100"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    disabled={Boolean(trendFromDate) !== Boolean(trendThroughDate)}
-                    onClick={() => setAppliedTrendRange(
-                      trendFromDate && trendThroughDate
-                        ? {
-                            from: `${trendFromDate}T00:00:00Z`,
-                            to: nextUtcDate(trendThroughDate),
-                          }
-                        : null,
-                    )}
-                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Apply date range
-                  </button>
-                </div>
-                <div className="grid gap-6 xl:grid-cols-2">
-                  <TrendRunChart data={trendBuckets} />
-                  <TrendPassRateChart data={trendBuckets} />
-                </div>
-              </Card>
-            )}
-
             {risks && (
               <Card
                 title="Project risk evidence"
@@ -342,7 +249,7 @@ const AnalyticsPage = () => {
                     </div>
                     <div className="grid gap-6 lg:grid-cols-2">
                       <DistributionChart title="Risk findings by severity (assessed)" data={riskSeverityData} valueLabel="Risk findings" />
-                      <DistributionChart title="Risk findings by category" data={riskCategoryData} valueLabel="Risk findings" />
+                      <PotentialImpactHighlights highlights={impactHighlights} />
                     </div>
                     <div className="mt-6 space-y-3">
                       {(risks.risk_findings_truncated || risks.risk_task_window_truncated) && (
@@ -352,38 +259,7 @@ const AnalyticsPage = () => {
                         </p>
                       )}
                       {risks.risks.map((risk) => (
-                        <article key={risk.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="font-medium text-slate-100">{risk.description}</h3>
-                            <span className={`rounded-full border px-2.5 py-1 text-xs ${
-                              risk.severity === 'critical' || risk.severity === 'high'
-                                ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
-                                : 'border-slate-700 bg-slate-900 text-slate-300'
-                            }`}>
-                              {risk.severity === 'unclassified' ? 'Severity unclassified' : `${risk.severity} · assessed`}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-slate-400">
-                            {risk.kind === 'ai_inferred' ? 'AI-inferred change-impact risk' : 'Observed execution fact'}
-                            {' · '}{risk.category.replaceAll('_', ' ')}
-                          </p>
-                          <p className="mt-2 text-sm text-slate-300">{risk.explanation}</p>
-                          {risk.potential_impact?.length > 0 && (
-                            <p className="mt-2 text-sm text-slate-400">
-                              Potential impact: {risk.potential_impact.join(' ')}
-                            </p>
-                          )}
-                          <p className="mt-2 text-xs text-slate-500">{risk.severity_basis}</p>
-                          {risk.evidence_references?.length > 0 && (
-                            <p className="mt-2 text-xs text-sky-200">
-                              Evidence: {risk.evidence_references.map((item) => item.label || item.id).join(', ')}
-                              {risk.evidence_references_truncated ? ` · showing ${risk.evidence_references.length} of ${risk.evidence_reference_count}` : ''}
-                            </p>
-                          )}
-                          {risk.evidence_note && (
-                            <p className="mt-2 text-xs text-amber-200">{risk.evidence_note}</p>
-                          )}
-                        </article>
+                        <RiskFindingCard key={risk.id} risk={risk} />
                       ))}
                     </div>
                     <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-slate-500">
@@ -395,65 +271,8 @@ const AnalyticsPage = () => {
             )}
 
             {workflowMonitoring && (
-              <Card
-                title="Agent workflow monitoring"
-                subtitle="Persisted workflow/task snapshots; this is not a real-time progress feed."
-              >
-                {workflowMonitoring.workflow_count === 0 ? (
-                  <p className="text-sm text-slate-400">No workflow history is recorded for this project.</p>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-xs text-slate-500">Showing the latest {workflowMonitoring.workflow_count} persisted workflow snapshots.</p>
-                    {workflowMonitoring.workflows.map((workflow) => (
-                      <section key={workflow.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="font-medium text-slate-100">
-                            Workflow {workflow.id} · {workflow.workflow_type.replaceAll('_', ' ')}
-                          </h3>
-                          <span className="text-sm capitalize text-slate-300">{workflow.status.replaceAll('_', ' ')}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Started {formatTimestamp(workflow.started_at)} · completed {formatTimestamp(workflow.completed_at)}
-                          {' · '}duration {workflow.duration_ms == null ? 'Unavailable' : `${workflow.duration_ms} ms`}
-                          {' · '}{workflow.failed_task_count} failed tasks · {workflow.retried_task_count} retried tasks
-                        </p>
-                        {workflow.error_summary && <p className="mt-2 text-sm text-rose-200">{workflow.error_summary}</p>}
-                        <ol className="mt-3 space-y-2">
-                          {workflow.tasks.map((task) => (
-                            <li key={task.id} className="rounded-lg bg-slate-900/70 p-3 text-sm">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-slate-200">
-                                  {task.execution_order == null ? `Plan ${task.plan_order} · not started` : `Started #${task.execution_order}`}
-                                  {' · '}{task.agent_name.replaceAll('_', ' ')}
-                                </span>
-                                <span className={`capitalize ${task.status === 'failed' ? 'text-rose-200' : task.status === 'retrying' ? 'text-amber-200' : 'text-slate-400'}`}>
-                                  {task.status} · {task.attempt_count} attempt(s)
-                                </span>
-                              </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Started {formatTimestamp(task.started_at)} · completed {formatTimestamp(task.completed_at)}
-                                {' · '}duration {task.duration_ms == null ? 'Unavailable' : `${task.duration_ms} ms`}
-                              </p>
-                              {task.error && (
-                                <p className="mt-1 text-xs text-rose-200">
-                                  {[task.error.code, task.error.message].filter(Boolean).join(': ')}
-                                </p>
-                              )}
-                              {task.attempts.length > 1 && (
-                                <p className="mt-1 text-xs text-amber-200">
-                                  Attempt history: {task.attempts.map((attempt) => `#${attempt.attempt_number} ${attempt.status}`).join(' · ')}
-                                </p>
-                              )}
-                            </li>
-                          ))}
-                        </ol>
-                      </section>
-                    ))}
-                  </div>
-                )}
-              </Card>
+              <WorkflowMonitoringSection workflowMonitoring={workflowMonitoring} />
             )}
-
             <Card
               title="AI-generated quality summary"
               subtitle="Generated on request from the listed project evidence. AI interpretation is not a release-readiness assessment."
@@ -474,7 +293,6 @@ const AnalyticsPage = () => {
                     ['Testing activity', qualitySummary.summary.testing_activity],
                     ['Test-case quality', qualitySummary.summary.test_case_quality],
                     ['Requirement traceability', qualitySummary.summary.requirement_traceability],
-                    ['Execution trends', qualitySummary.summary.execution_trends],
                     ['Significant failures', qualitySummary.summary.significant_failures],
                     ['Identified risks', qualitySummary.summary.identified_risks],
                     ['Missing evidence', qualitySummary.summary.missing_evidence],
@@ -514,7 +332,122 @@ const distributionData = (counts) => (
     : []
 )
 
-const DistributionChart = ({ title, data, valueLabel }) => (
+function WorkflowMonitoringSection({ workflowMonitoring }) {
+  const [expanded, setExpanded] = useState(false)
+  const workflows = Array.isArray(workflowMonitoring.workflows)
+    ? workflowMonitoring.workflows
+    : []
+  const workflowCount = workflowMonitoring.workflow_count ?? workflows.length
+
+  return (
+    <Card
+      title="Agent workflow monitoring"
+      subtitle={`${workflowCount} persisted workflow snapshots. This is not a real-time progress feed.`}
+      action={(
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+          className="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition-colors hover:border-slate-500 hover:text-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+        >
+          {expanded ? 'Hide snapshots' : 'Show snapshots'}
+        </button>
+      )}
+    >
+      {expanded && (
+        workflowCount === 0 || workflows.length === 0 ? (
+          <p className="text-sm text-slate-400">No workflow history is recorded for this project.</p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">Showing the latest {workflowCount} persisted workflow snapshots.</p>
+            {workflows.map((workflow) => (
+              <WorkflowSnapshot key={workflow.id} workflow={workflow} />
+            ))}
+          </div>
+        )
+      )}
+    </Card>
+  )
+}
+
+function WorkflowSnapshot({ workflow }) {
+  const [expanded, setExpanded] = useState(false)
+  const tasks = Array.isArray(workflow.tasks) ? workflow.tasks : []
+
+  return (
+    <details
+      className="rounded-xl border border-slate-800 bg-slate-950/50 p-3 transition-colors open:border-slate-700"
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-x-3 gap-y-2 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-slate-100">
+            Workflow {workflow.id} · {String(workflow.workflow_type || 'workflow').replaceAll('_', ' ')}
+          </span>
+          <span className="mt-1 block text-xs text-slate-500">
+            Started {formatTimestamp(workflow.started_at)} · completed {formatTimestamp(workflow.completed_at)}
+            {' · '}duration {workflow.duration_ms == null ? 'Unavailable' : `${workflow.duration_ms} ms`}
+            {' · '}{workflow.failed_task_count} failed · {workflow.retried_task_count} retried · {tasks.length} tasks
+          </span>
+        </span>
+        <span className={`shrink-0 text-xs capitalize ${workflow.status === 'failed' || workflow.status === 'partially_completed' ? 'text-rose-200' : 'text-slate-300'}`}>
+          {String(workflow.status || 'unknown').replaceAll('_', ' ')}
+        </span>
+      </summary>
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-slate-800 pt-3">
+          {workflow.error_summary && (
+            <p className="text-sm text-rose-200">{workflow.error_summary}</p>
+          )}
+          {tasks.length === 0 ? (
+            <p className="text-sm text-slate-400">No agent task details are recorded for this workflow.</p>
+          ) : (
+            <ol className="space-y-2">
+              {tasks.map((task, index) => {
+                const attempts = Array.isArray(task.attempts) ? task.attempts : []
+                return (
+                  <li key={task.id || `${workflow.id}-task-${index}`} className="rounded-lg bg-slate-900/70 p-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-slate-200">
+                        {task.execution_order == null ? `Plan ${task.plan_order} · not started` : `Started #${task.execution_order}`}
+                        {' · '}{String(task.agent_name || 'agent').replaceAll('_', ' ')}
+                      </span>
+                      <span className={`capitalize ${task.status === 'failed' ? 'text-rose-200' : task.status === 'retrying' ? 'text-amber-200' : 'text-slate-400'}`}>
+                        {task.status} · {task.attempt_count} attempt(s)
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Started {formatTimestamp(task.started_at)} · completed {formatTimestamp(task.completed_at)}
+                      {' · '}duration {task.duration_ms == null ? 'Unavailable' : `${task.duration_ms} ms`}
+                    </p>
+                    {task.error && (
+                      <p className="mt-1 text-xs text-rose-200">
+                        {[task.error.code, task.error.message].filter(Boolean).join(': ')}
+                      </p>
+                    )}
+                    {attempts.length > 1 && (
+                      <p className="mt-1 text-xs text-amber-200">
+                        Attempt history: {attempts.map((attempt) => `#${attempt.attempt_number} ${attempt.status}`).join(' · ')}
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </div>
+      )}
+    </details>
+  )
+}
+
+const DistributionChart = ({
+  title,
+  data,
+  valueLabel,
+  showPercentages = false,
+  normalizeCategoryAxis = false,
+}) => (
   <div>
     <h3 className="mb-2 text-sm font-medium text-slate-300">{title}</h3>
     <div className="h-56">
@@ -524,16 +457,207 @@ const DistributionChart = ({ title, data, valueLabel }) => (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
             <CartesianGrid stroke="#1e293b" vertical={false} />
-            <XAxis dataKey="name" stroke="#64748b" />
+            <XAxis
+              dataKey="name"
+              stroke="#64748b"
+              {...(normalizeCategoryAxis ? {
+                type: 'category',
+                allowDuplicatedCategory: false,
+                interval: 0,
+                tickMargin: 8,
+                tick: { fill: '#64748b', fontSize: 11 },
+              } : {})}
+            />
             <YAxis stroke="#64748b" allowDecimals={false} />
-            <Tooltip />
+            <Tooltip
+              formatter={(value, _name, item) => [
+                showPercentages && Number.isFinite(item?.payload?.percentage)
+                  ? `${value} (${item.payload.percentage}%)`
+                  : value,
+                valueLabel,
+              ]}
+            />
             <Bar dataKey="value" name={valueLabel} fill="#38bdf8" />
           </BarChart>
         </ResponsiveContainer>
       )}
     </div>
+    {showPercentages && data.length > 0 && (
+      <ul aria-label="Review status counts and percentages" className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-400">
+        {data.map((item) => (
+          <li key={item.name}>{item.name}: {item.value} ({item.percentage}%)</li>
+        ))}
+      </ul>
+    )}
   </div>
 )
+
+const PotentialImpactHighlights = ({ highlights }) => (
+  <section aria-label="Potential Impact Highlights">
+    <h3 className="mb-3 text-sm font-medium text-slate-300">Potential Impact Highlights</h3>
+    {highlights.length === 0 ? (
+      <p className="text-sm text-slate-400">No potential impact descriptions are available from persisted AI-inferred findings.</p>
+    ) : (
+      <div className="space-y-2">
+        {highlights.map((highlight) => (
+          <PotentialImpactHighlight key={highlight.name} highlight={highlight} />
+        ))}
+      </div>
+    )}
+  </section>
+)
+
+function PotentialImpactHighlight({ highlight }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <details
+      className="rounded-xl border border-slate-800 bg-slate-950/40 p-3"
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-slate-200">{highlight.name}</span>
+        <span className="text-xs text-slate-400">
+          {highlight.descriptionCount} {highlight.descriptionCount === 1 ? 'impact' : 'impacts'}
+          {' · '}{highlight.findingCount} {highlight.findingCount === 1 ? 'finding' : 'findings'}
+        </span>
+      </summary>
+      {expanded && (
+        <ul className="mt-3 space-y-3 border-t border-slate-800 pt-3">
+          {highlight.descriptions.map((item, index) => (
+            <li key={`${highlight.name}-${index}`} className="text-sm">
+              <p className="whitespace-pre-wrap text-slate-300">{item.description}</p>
+              <div className="mt-2">
+                <p className="text-xs font-medium text-slate-500">Supporting risk findings</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-slate-400">
+                  {item.findingTitles.map((title) => <li key={title}>{title}</li>)}
+                </ul>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
+  )
+}
+
+function RiskFindingCard({ risk }) {
+  const [expanded, setExpanded] = useState(false)
+  const severity = risk.severity || 'unclassified'
+  const assessmentType = risk.kind === 'ai_inferred'
+    ? 'AI-inferred change-impact risk'
+    : risk.kind === 'observed_fact'
+      ? 'Observed execution fact'
+      : 'Assessment type unavailable'
+  const evidenceReferences = Array.isArray(risk.evidence_references)
+    ? risk.evidence_references
+    : []
+
+  return (
+    <details
+      className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
+        <span className="line-clamp-2 min-w-0 flex-1 font-medium text-slate-100">
+          {risk.description || 'Untitled risk finding'}
+        </span>
+        <span className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-2.5 py-1 text-xs ${
+            severity === 'critical' || severity === 'high'
+              ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+              : 'border-slate-700 bg-slate-900 text-slate-300'
+          }`}>
+            {severity === 'unclassified' ? 'Severity unclassified' : `${severity} severity`}
+          </span>
+          <span className="text-xs text-slate-400">{assessmentType}</span>
+        </span>
+      </summary>
+      {expanded && (
+        <div className="mt-4 space-y-4 border-t border-slate-800 pt-4">
+          <section>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Description</h4>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-200">
+              {risk.description || 'No description recorded.'}
+            </p>
+          </section>
+          <section>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Potential impact</h4>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-300">
+              {Array.isArray(risk.potential_impact) && risk.potential_impact.length
+                ? risk.potential_impact.join(' ')
+                : 'No potential impact recorded.'}
+            </p>
+          </section>
+          <section>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Assessment details</h4>
+            <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-slate-500">Assessment type</dt>
+                <dd className="mt-1 text-slate-300">{assessmentType}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Category</dt>
+                <dd className="mt-1 capitalize text-slate-300">
+                  {(risk.category || 'not specified').replaceAll('_', ' ')}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Assessment</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-slate-300">
+                  {risk.explanation || 'No assessment explanation recorded.'}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">Severity basis</dt>
+                <dd className="mt-1 text-slate-300">
+                  {risk.severity_basis || 'No severity basis recorded.'}
+                </dd>
+              </div>
+              {(risk.assessed_at || risk.source_workflow_id != null || risk.source_task_id != null) && (
+                <div className="sm:col-span-2 text-xs text-slate-500">
+                  {risk.assessed_at && <>Assessed {formatTimestamp(risk.assessed_at)}</>}
+                  {risk.source_workflow_id != null && ` · Workflow ${risk.source_workflow_id}`}
+                  {risk.source_task_id != null && ` · Task ${risk.source_task_id}`}
+                </div>
+              )}
+            </dl>
+          </section>
+          <section>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Source evidence references</h4>
+            {evidenceReferences.length ? (
+              <ul className="mt-2 space-y-2">
+                {evidenceReferences.map((reference) => (
+                  <li
+                    key={reference.id || `${reference.kind}-${reference.document_id}-${reference.chunk_id}`}
+                    className="rounded-lg border border-slate-800 bg-slate-900/60 p-3 text-sm"
+                  >
+                    <p className="break-all text-sky-200">
+                      {reference.label || reference.id || 'Evidence reference'}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {reference.kind?.replaceAll('_', ' ') || 'source'}
+                      {reference.document_id != null && ` · Document ${reference.document_id}`}
+                      {reference.chunk_id != null && ` · Chunk ${reference.chunk_id}`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-slate-400">No source evidence references recorded.</p>
+            )}
+            {risk.evidence_references_truncated && (
+              <p className="mt-2 text-xs text-slate-500">
+                Showing {evidenceReferences.length} of {risk.evidence_reference_count} references.
+              </p>
+            )}
+            {risk.evidence_note && <p className="mt-2 text-xs text-amber-200">{risk.evidence_note}</p>}
+          </section>
+        </div>
+      )}
+    </details>
+  )
+}
 
 const SummaryStatements = ({ title, items }) => (
   <section className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
@@ -550,79 +674,12 @@ const SummaryStatements = ({ title, items }) => (
   </section>
 )
 
-const TrendRunChart = ({ data }) => (
-  <div>
-    <h3 className="mb-2 text-sm font-medium text-slate-300">Execution runs by outcome</h3>
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <CartesianGrid stroke="#1e293b" vertical={false} />
-          <XAxis dataKey="start" stroke="#64748b" tickFormatter={formatBucketDate} />
-          <YAxis stroke="#64748b" allowDecimals={false} />
-          <Tooltip labelFormatter={formatBucketDate} />
-          <Legend />
-          {Object.entries(STATUS_COLORS).map(([status, color]) => (
-            <Bar
-              key={status}
-              dataKey={`status_counts.${status}`}
-              name={status}
-              stackId="runs"
-              fill={color}
-            />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-)
-
-const TrendPassRateChart = ({ data }) => (
-  <div>
-    <h3 className="mb-2 text-sm font-medium text-slate-300">Pass rate among passed/failed runs</h3>
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid stroke="#1e293b" vertical={false} />
-          <XAxis dataKey="start" stroke="#64748b" tickFormatter={formatBucketDate} />
-          <YAxis stroke="#64748b" domain={[0, 100]} unit="%" />
-          <Tooltip
-            labelFormatter={formatBucketDate}
-            formatter={(value) => value == null ? 'Unavailable' : `${value}%`}
-          />
-          <Line
-            type="monotone"
-            dataKey="pass_rate"
-            name="Pass rate"
-            stroke="#34d399"
-            strokeWidth={3}
-            connectNulls={false}
-            dot={{ r: 3 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-)
-
-function formatBucketDate(value) {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime())
-    ? 'Unavailable'
-    : date.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: '2-digit' })
-}
-
 function formatTimestamp(value) {
   if (!value) return 'Unavailable'
   const date = new Date(value)
   return Number.isNaN(date.getTime())
     ? 'Unavailable'
     : date.toLocaleString(undefined, { timeZone: 'UTC' })
-}
-
-function nextUtcDate(value) {
-  const date = new Date(`${value}T00:00:00Z`)
-  date.setUTCDate(date.getUTCDate() + 1)
-  return date.toISOString()
 }
 
 export default AnalyticsPage
