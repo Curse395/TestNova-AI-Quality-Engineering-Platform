@@ -1,8 +1,9 @@
+import json
 import re
 from difflib import SequenceMatcher
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.evaluation.dataset import EvaluationExample
 from app.schemas.test_case_schema import GeneratedTestCase
@@ -62,9 +63,148 @@ def _tokens(value: str) -> set[str]:
     }
 
 
+def _metric(
+    numerator: int,
+    denominator: int,
+    **details: Any,
+) -> dict[str, Any]:
+    return {
+        "numerator": numerator,
+        "denominator": denominator,
+        "rate": numerator / denominator if denominator else None,
+        "applicability": "applicable" if denominator else "not_applicable",
+        **details,
+    }
+
+
+def _quality_metrics(
+    example: EvaluationExample,
+    cases: list[GeneratedTestCase],
+    *,
+    candidate_count: int,
+    schema_valid_count: int,
+    generation_failed: bool,
+) -> dict[str, Any]:
+    expected_requirements = set(example.expected_requirement_coverage)
+    covered_requirements = {
+        key
+        for case in cases
+        for key in case.requirement_keys
+        if key in expected_requirements
+    }
+    annotations = {
+        annotation.requirement_key: set(annotation.evidence_ids)
+        for annotation in example.annotations
+    }
+    valid_evidence_ids = {chunk.id for chunk in example.evidence_chunks}
+    evidence_grounded_cases = sum(
+        bool(
+            set(case.evidence_chunk_ids) & valid_evidence_ids
+            and any(
+                key in annotations
+                and set(case.evidence_chunk_ids) & annotations[key]
+                for key in case.requirement_keys
+            )
+        )
+        for case in cases
+    )
+    expected_categories = set(example.expected_categories)
+    covered_categories = {case.category for case in cases} & expected_categories
+    case_texts = [_normalize(_case_text(case)) for case in cases]
+    duplicate_candidates = sum(
+        any(
+            SequenceMatcher(None, text, prior).ratio() >= 0.9
+            for prior in case_texts[:index]
+        )
+        for index, text in enumerate(case_texts)
+    )
+    steps = [step for case in cases for step in case.steps]
+    complete_steps = sum(
+        len(step.action.strip()) >= 12
+        and len(step.expected_result.strip()) >= 12
+        for step in steps
+    )
+    vague_result = re.compile(
+        r"\b(?:works?|behaves?|functions?|operates?)\s+"
+        r"(?:as expected|correctly|properly)\b|\bsystem behaves as expected\b",
+        re.IGNORECASE,
+    )
+    expected_results = [
+        result
+        for case in cases
+        for result in [
+            case.expected_result,
+            *(step.expected_result for step in case.steps),
+        ]
+    ]
+    specific_results = sum(
+        len(result.strip()) >= 12 and not vague_result.search(result)
+        for result in expected_results
+    )
+    return {
+        "requirement_coverage": _metric(
+            len(covered_requirements),
+            len(expected_requirements),
+            covered=sorted(covered_requirements),
+            missing=sorted(expected_requirements - covered_requirements),
+        ),
+        "evidence_grounding": _metric(
+            evidence_grounded_cases,
+            len(cases) if example.annotations else 0,
+            method="case_citation_intersects_reference_annotation_evidence",
+        ),
+        "schema_validity": _metric(schema_valid_count, candidate_count),
+        "duplicate_rate": _metric(
+            duplicate_candidates,
+            len(cases),
+            method="case_text_sequence_similarity_at_least_0.9",
+        ),
+        "scenario_diversity": _metric(
+            len(covered_categories),
+            len(expected_categories),
+            represented=sorted(covered_categories),
+            missing=sorted(expected_categories - covered_categories),
+        ),
+        "step_completeness": _metric(
+            complete_steps,
+            len(steps),
+            method="action_and_step_result_each_at_least_12_characters",
+        ),
+        "expected_result_quality": _metric(
+            specific_results,
+            len(expected_results),
+            method="at_least_12_characters_and_not_a_vague_outcome_phrase",
+        ),
+        "generation_failure_rate": _metric(
+            int(generation_failed),
+            1,
+            scope="single_evaluation_example",
+        ),
+    }
+
+
+def _raw_candidate_schema_count(raw_output: str) -> tuple[int, int]:
+    try:
+        parsed = json.loads(raw_output)
+    except (json.JSONDecodeError, TypeError):
+        return 0, 0
+    candidates = parsed.get("test_cases") if isinstance(parsed, dict) else None
+    if not isinstance(candidates, list):
+        return 0, 0
+    valid_count = 0
+    for candidate in candidates:
+        try:
+            GeneratedTestCase.model_validate(candidate)
+        except (ValidationError, TypeError, ValueError):
+            continue
+        valid_count += 1
+    return len(candidates), valid_count
+
+
 def evaluate_output(example: EvaluationExample, raw_output: str) -> dict[str, Any]:
     structured = validate_structured_output(raw_output, BenchmarkOutput)
     if not structured.success or structured.value is None:
+        candidate_count, schema_valid_count = _raw_candidate_schema_count(raw_output)
         return {
             "structured_output": {
                 "valid": False,
@@ -102,10 +242,18 @@ def evaluate_output(example: EvaluationExample, raw_output: str) -> dict[str, An
                 "deterministic_components": {},
                 "human_review_required": True,
             },
+            "quality_metrics": _quality_metrics(
+                example,
+                [],
+                candidate_count=candidate_count,
+                schema_valid_count=schema_valid_count,
+                generation_failed=True,
+            ),
             "generated_case_count": None,
         }
 
     cases = structured.value.test_cases
+    candidate_count, schema_valid_count = _raw_candidate_schema_count(raw_output)
     expected_requirements = set(example.expected_requirement_coverage)
     valid_evidence_ids = {chunk.id for chunk in example.evidence_chunks}
     expected_relevant_ids = {
@@ -305,6 +453,19 @@ def evaluate_output(example: EvaluationExample, raw_output: str) -> dict[str, An
             "human_review_required": bool(cases),
             "human_review_scores": None,
         },
+        "quality_metrics": _quality_metrics(
+            example,
+            cases,
+            candidate_count=candidate_count,
+            schema_valid_count=schema_valid_count,
+            generation_failed=(
+                not cases
+                and bool(
+                    example.expected_requirement_coverage
+                    or example.expected_categories
+                )
+            ),
+        ),
         "generated_case_count": len(cases),
     }
 

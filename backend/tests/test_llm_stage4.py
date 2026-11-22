@@ -27,6 +27,15 @@ PARAMETERS = GenerationParameters(
 )
 
 
+@pytest.fixture(autouse=True)
+def disable_retry_sleep_and_file_telemetry(monkeypatch):
+    monkeypatch.setattr("app.llm.router.time.sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        "app.llm.router.get_default_telemetry_service",
+        InMemoryLLMTelemetryService,
+    )
+
+
 class FakeProvider:
     def __init__(self, provider_name, model_name, responses):
         self.provider_name = provider_name
@@ -151,8 +160,17 @@ def test_llm_service_collects_successful_provider_telemetry(provider_name):
     assert result == {
         "success": True,
         "answer": "generated text",
+        "provider": provider_name,
         "model": model,
         "stage": "complete",
+        "fallback_configured": False,
+        "fallback_attempted": False,
+        "fallback_eligible": False,
+        "provider_attempt_count": 1,
+        "retry_count": 0,
+        "input_token_count": 10,
+        "output_token_count": 5,
+        "total_token_count": 15,
     }
     record = telemetry.get_recent_records()[0]
     assert record.provider == provider_name
@@ -175,7 +193,10 @@ def test_failed_calls_capture_error_category_and_missing_usage(category):
     provider = FakeProvider(
         "gemini",
         "gemini-model",
-        [_failure("gemini", "gemini-model", category)],
+        [
+            _failure("gemini", "gemini-model", category),
+            _failure("gemini", "gemini-model", category),
+        ],
     )
     telemetry = InMemoryLLMTelemetryService()
     result = LLMRouter(provider, telemetry_service=telemetry).generate(
@@ -197,7 +218,10 @@ def test_raised_timeout_is_captured_as_timeout_without_error_message():
     provider = FakeProvider(
         "gemini",
         "gemini-model",
-        [TimeoutError("sensitive exception details")],
+        [
+            TimeoutError("sensitive exception details"),
+            TimeoutError("sensitive exception details"),
+        ],
     )
     telemetry = InMemoryLLMTelemetryService()
 
@@ -210,13 +234,17 @@ def test_raised_timeout_is_captured_as_timeout_without_error_message():
     assert record.error_category == LLMErrorCategory.TIMEOUT.value
     assert not hasattr(record, "error_message")
     assert "sensitive exception details" not in repr(record)
+    assert len(telemetry.get_recent_records()) == 2
 
 
 def test_fallback_tracks_both_attempts_and_final_provider():
     primary = FakeProvider(
         "gemini",
         "gemini-model",
-        [_failure("gemini", "gemini-model", LLMErrorCategory.RATE_LIMIT)],
+        [
+            _failure("gemini", "gemini-model", LLMErrorCategory.RATE_LIMIT),
+            _failure("gemini", "gemini-model", LLMErrorCategory.RATE_LIMIT),
+        ],
     )
     fallback = FakeProvider(
         "groq",
@@ -231,22 +259,25 @@ def test_fallback_tracks_both_attempts_and_final_provider():
     assert result.success is True
     assert result.provider == "groq"
     records = telemetry.get_recent_records()
-    assert len(records) == 2
-    assert [record.attempt_number for record in records] == [1, 2]
-    assert [record.is_fallback_attempt for record in records] == [False, True]
+    assert len(records) == 3
+    assert [record.attempt_number for record in records] == [1, 2, 3]
+    assert [record.is_fallback_attempt for record in records] == [False, False, True]
     assert all(record.fallback_attempted for record in records)
     assert all(record.fallback_succeeded for record in records)
     assert all(record.primary_provider == "gemini" for record in records)
     assert all(record.final_provider == "groq" for record in records)
     assert records[0].request_id == "correlation-id"
-    assert records[1].request_id == "correlation-id"
+    assert records[2].request_id == "correlation-id"
 
 
 def test_fallback_failure_is_recorded_separately_and_request_fails():
     primary = FakeProvider(
         "gemini",
         "gemini-model",
-        [_failure("gemini", "gemini-model", LLMErrorCategory.TIMEOUT)],
+        [
+            _failure("gemini", "gemini-model", LLMErrorCategory.TIMEOUT),
+            _failure("gemini", "gemini-model", LLMErrorCategory.TIMEOUT),
+        ],
     )
     fallback = FakeProvider(
         "groq",
@@ -261,11 +292,11 @@ def test_fallback_failure_is_recorded_separately_and_request_fails():
 
     assert result.success is False
     records = telemetry.get_recent_records()
-    assert len(records) == 2
+    assert len(records) == 3
     assert all(not record.request_success for record in records)
     summary = telemetry.get_summary()
-    assert summary.total_calls == 2
-    assert summary.failed_calls == 2
+    assert summary.total_calls == 3
+    assert summary.failed_calls == 3
     assert summary.total_requests == 1
     assert summary.failed_requests == 1
     assert summary.fallback_attempts == 1
@@ -361,6 +392,7 @@ def test_monitoring_summary_aggregates_attempts_requests_tokens_and_fallbacks():
         "gemini-model",
         [
             _failure("gemini", "gemini-model", LLMErrorCategory.RATE_LIMIT),
+            _failure("gemini", "gemini-model", LLMErrorCategory.RATE_LIMIT),
             _success(
                 "gemini",
                 "gemini-model",
@@ -382,14 +414,14 @@ def test_monitoring_summary_aggregates_attempts_requests_tokens_and_fallbacks():
     router.generate(_request("gemini", "gemini-model", request_id="second-request"))
 
     summary = telemetry.get_summary()
-    assert summary.total_calls == 3
+    assert summary.total_calls == 4
     assert summary.successful_calls == 2
-    assert summary.failed_calls == 1
-    assert summary.success_rate == pytest.approx(2 / 3)
+    assert summary.failed_calls == 2
+    assert summary.success_rate == pytest.approx(0.5)
     assert summary.average_latency_ms is not None
     assert summary.median_latency_ms is not None
     assert summary.provider_model_usage == {
-        "gemini/gemini-model": 2,
+        "gemini/gemini-model": 3,
         "groq/groq-model": 1,
     }
     assert summary.total_requests == 2

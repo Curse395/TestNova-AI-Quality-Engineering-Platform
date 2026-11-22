@@ -6,6 +6,7 @@
     {
       "id": "SYN-AUTH-POS-001",
       "scenario_type": "positive",
+      "difficulty": "easy",
       "requirements_prompt": "Generate a test case for SYN-AUTH-1. Do not infer authentication behavior beyond the supplied evidence.",
       "evidence_chunks": [
         {
@@ -30,11 +31,13 @@
       "known_constraints": [
         "The evidence specifies only the successful sign-in result."
       ],
+      "evaluation_notes": ["Authentication happy-path grounding."],
       "scoring_guidance": "A supported case must use the successful registered-user flow and cite chunk 71001."
     },
     {
       "id": "SYN-AUTH-NEG-002",
       "scenario_type": "negative",
+      "difficulty": "easy",
       "requirements_prompt": "Generate a negative test case for SYN-AUTH-2 using only the documented validation behavior.",
       "evidence_chunks": [
         {
@@ -59,11 +62,13 @@
       "known_constraints": [
         "Only the empty-email behavior and its message are specified."
       ],
+      "evaluation_notes": ["Input-validation error behavior."],
       "scoring_guidance": "Do not infer validation for malformed addresses, passwords, or lockout."
     },
     {
       "id": "SYN-CART-BOUNDARY-003",
       "scenario_type": "boundary",
+      "difficulty": "medium",
       "requirements_prompt": "Generate boundary and negative test cases for SYN-CART-1. Keep each case tied to an explicit limit.",
       "evidence_chunks": [
         {
@@ -93,11 +98,13 @@
         "The maximum is five item lines.",
         "No per-line quantity limit is specified."
       ],
+      "evaluation_notes": ["Business rule and boundary coverage."],
       "scoring_guidance": "A five-line accepted case and/or a greater-than-five rejection case are supported. Do not turn the item-line limit into a quantity limit."
     },
     {
       "id": "SYN-RESET-EDGE-004",
       "scenario_type": "edge",
+      "difficulty": "medium",
       "requirements_prompt": "Generate a test case for the documented reset-code expiry behavior in SYN-RESET-1.",
       "evidence_chunks": [
         {
@@ -126,11 +133,13 @@
       "known_constraints": [
         "The exact-boundary behavior is unspecified."
       ],
+      "evaluation_notes": ["Expiry error handling without inventing the exact-boundary outcome."],
       "scoring_guidance": "Testing a code after expiry is supported. Do not assert the exact-boundary outcome."
     },
     {
       "id": "SYN-EXPORT-INSUFFICIENT-005",
       "scenario_type": "insufficient_evidence",
+      "difficulty": "hard",
       "requirements_prompt": "Assess whether a useful test case can be generated for SYN-EXPORT-1. Do not assume what the export includes or how errors behave.",
       "evidence_chunks": [
         {
@@ -150,7 +159,71 @@
       "known_constraints": [
         "The evidence confirms a feature exists but specifies no input, output, or observable behavior."
       ],
+      "evaluation_notes": ["No-case control for insufficient evidence."],
       "scoring_guidance": "Return an empty test_cases list rather than inventing export behavior."
+    },
+    {
+      "id": "SYN-ACCESS-ROLE-006",
+      "scenario_type": "negative",
+      "difficulty": "medium",
+      "requirements_prompt": "Generate a test case for SYN-ACCESS-1 using only the documented role restriction.",
+      "evidence_chunks": [{
+        "id": 71051,
+        "content": "Synthetic example. SYN-ACCESS-1: Only users assigned the billing-administrator role may approve an invoice. Users without that role are denied approval."
+      }],
+      "expected_requirement_coverage": ["SYN-ACCESS-1"],
+      "expected_categories": ["negative"],
+      "unsupported_behaviors": ["audit log entry", "custom denial message", "invoice editing"],
+      "annotations": [{
+        "requirement_key": "SYN-ACCESS-1",
+        "evidence_ids": [71051],
+        "evidence_quote": "Users without that role are denied approval."
+      }],
+      "known_constraints": ["The denial presentation is not specified."],
+      "evaluation_notes": ["Authorization coverage; do not invent an audit trail or UI message."],
+      "scoring_guidance": "A non-billing-administrator denial case is supported."
+    },
+    {
+      "id": "SYN-IMPORT-RULE-007",
+      "scenario_type": "boundary",
+      "difficulty": "hard",
+      "requirements_prompt": "Generate a test case for SYN-IMPORT-1 and retain the documented row limit and error behavior.",
+      "evidence_chunks": [{
+        "id": 71061,
+        "content": "Synthetic example. SYN-IMPORT-1: A customer import accepts CSV files with up to 1,000 data rows. A file with more than 1,000 data rows is rejected and no customer records are created."
+      }],
+      "expected_requirement_coverage": ["SYN-IMPORT-1"],
+      "expected_categories": ["boundary", "negative"],
+      "unsupported_behaviors": ["partial import", "duplicate-row handling", "spreadsheet file support"],
+      "annotations": [{
+        "requirement_key": "SYN-IMPORT-1",
+        "evidence_ids": [71061],
+        "evidence_quote": "A file with more than 1,000 data rows is rejected and no customer records are created."
+      }],
+      "known_constraints": ["The source defines a row limit, not duplicate handling."],
+      "evaluation_notes": ["Data-processing business rule with observable no-write result."],
+      "scoring_guidance": "Use the 1,000-row limit or a greater-than-1,000 rejection without asserting partial processing."
+    },
+    {
+      "id": "SYN-ORDER-WORKFLOW-008",
+      "scenario_type": "positive",
+      "difficulty": "hard",
+      "requirements_prompt": "Generate a multi-step test case for SYN-ORDER-1 using the documented sequence only.",
+      "evidence_chunks": [{
+        "id": 71071,
+        "content": "Synthetic example. SYN-ORDER-1: After a customer submits an order, the system reserves available inventory and then creates the order confirmation. If inventory cannot be reserved, no confirmation is created."
+      }],
+      "expected_requirement_coverage": ["SYN-ORDER-1"],
+      "expected_categories": ["positive", "negative"],
+      "unsupported_behaviors": ["payment capture", "shipment creation", "customer notification"],
+      "annotations": [{
+        "requirement_key": "SYN-ORDER-1",
+        "evidence_ids": [71071],
+        "evidence_quote": "the system reserves available inventory and then creates the order confirmation."
+      }],
+      "known_constraints": ["Payment, shipping, and notifications are not documented."],
+      "evaluation_notes": ["Multi-step workflow and error-path coverage."],
+      "scoring_guidance": "Validate reservation before confirmation; no confirmation after an unavailable-inventory failure."
     }
   ]
 }

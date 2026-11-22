@@ -17,8 +17,11 @@ Published datasets are immutable: make a new file/version when changing any
 example, evidence, reference, or scoring guidance. Reports record the dataset
 version, a canonical-content SHA-256 digest, and selected IDs.
 
-Examples cover positive, negative, boundary, edge, multi-chunk, and
-insufficient-evidence cases. All product details are explicitly synthetic.
+The eight examples cover functional authentication, authorization,
+input validation, business-rule boundaries, data-import processing,
+error handling, multi-step ordering, and insufficient-evidence controls.
+Each declares an easy/medium/hard difficulty and evaluation notes. All product
+details are explicitly synthetic.
 
 ## Evaluation dimensions and score interpretation
 
@@ -41,6 +44,20 @@ insufficient-evidence cases. All product details are explicitly synthetic.
 - **Requirement/category coverage:** compares generated requirement keys and
   categories against dataset expectations. Unexpected keys/categories and
   missing coverage are reported separately.
+- **Milestone 3 quality metrics:** benchmark reports preserve the evaluator's
+  explicit numerator and denominator for requirement coverage, evidence
+  grounding, schema validity, duplicate rate, scenario diversity, step
+  completeness, expected-result quality, and generation failure rate. At
+  report level, applicable numerators and denominators are summed; examples
+  with a zero denominator are marked `not_applicable`, never counted as zero.
+  Duplicate and generation-failure rates are diagnostic rates, not aggregate
+  quality scores.
+- **Reliability accounting:** reports count retry attempts as telemetry
+  attempts numbered after the first, fallback attempts as attempts marked
+  `is_fallback_attempt`, and fallback-affected/successful requests by unique
+  request ID. Provider comparisons disable fallback to keep providers
+  independent, but the fields remain available for reliability regression
+  reports that include such telemetry.
 - **Deterministic usefulness proxy:** unweighted mean of requirement coverage,
   action/expected-result length heuristics, schema-based step testability,
   evidence-token overlap, expected-category coverage, and pairwise similarity

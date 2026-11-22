@@ -53,6 +53,21 @@ ServiceFactory = Callable[
 ]
 
 
+# These names intentionally mirror Milestone 3's offline evaluator.  Keeping
+# the aggregation here rather than in the production generator lets benchmark
+# reports compare providers without changing generation behavior.
+QUALITY_METRIC_NAMES = (
+    "requirement_coverage",
+    "evidence_grounding",
+    "schema_validity",
+    "duplicate_rate",
+    "scenario_diversity",
+    "step_completeness",
+    "expected_result_quality",
+    "generation_failure_rate",
+)
+
+
 def _create_llm_service(
     provider_name: str,
     model_name: str,
@@ -94,6 +109,42 @@ def _aggregate(values: Sequence[float]) -> dict[str, float | int | None]:
         "average": sum(values) / len(values) if values else None,
         "median": statistics.median(values) if values else None,
     }
+
+
+def _aggregate_quality_metrics(
+    completed: Sequence[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Combine only applicable per-example quality measurements.
+
+    Metrics have explicit numerators and denominators so empty/inapplicable
+    examples (for example, no expected categories) are not treated as zero.
+    """
+    summaries: dict[str, dict[str, Any]] = {}
+    for name in QUALITY_METRIC_NAMES:
+        numerator = 0
+        denominator = 0
+        measured_examples = 0
+        for result in completed:
+            metric = result.get("scores", {}).get("quality_metrics", {}).get(name)
+            if not isinstance(metric, dict):
+                continue
+            value_numerator = metric.get("numerator")
+            value_denominator = metric.get("denominator")
+            if not isinstance(value_numerator, int) or not isinstance(
+                value_denominator, int
+            ) or value_denominator <= 0:
+                continue
+            numerator += value_numerator
+            denominator += value_denominator
+            measured_examples += 1
+        summaries[name] = {
+            "numerator": numerator,
+            "denominator": denominator,
+            "rate": numerator / denominator if denominator else None,
+            "applicability": "applicable" if denominator else "not_applicable",
+            "measured_example_count": measured_examples,
+        }
+    return summaries
 
 
 def aggregate_results(
@@ -160,6 +211,24 @@ def aggregate_results(
         if attempt.get("estimated_cost") is not None
     ]
     failed_calls = sum(not attempt["success"] for attempt in all_attempts)
+    retry_attempt_count = sum(
+        isinstance(attempt.get("attempt_number"), int)
+        and attempt["attempt_number"] > 1
+        for attempt in all_attempts
+    )
+    fallback_attempt_count = sum(
+        bool(attempt.get("is_fallback_attempt")) for attempt in all_attempts
+    )
+    fallback_request_ids = {
+        attempt.get("request_id")
+        for attempt in all_attempts
+        if attempt.get("fallback_attempted") and attempt.get("request_id")
+    }
+    fallback_success_ids = {
+        attempt.get("request_id")
+        for attempt in all_attempts
+        if attempt.get("fallback_succeeded") and attempt.get("request_id")
+    }
     supported_examples = [
         item["scores"]["evidence_accuracy"]["score"]
         for item in completed
@@ -220,6 +289,18 @@ def aggregate_results(
             "usefulness", "test_case_usefulness_score"
         ),
         "human_reviewed_usefulness_score": None,
+        "quality_metrics": _aggregate_quality_metrics(completed),
+        "reliability": {
+            "attempt_count": len(all_attempts),
+            "retry_attempt_count": retry_attempt_count,
+            "fallback_attempt_count": fallback_attempt_count,
+            "fallback_affected_request_count": len(fallback_request_ids),
+            "fallback_successful_request_count": len(fallback_success_ids),
+            "note": (
+                "Provider comparisons disable fallback; these fields remain "
+                "available when supplied attempt telemetry records retries or fallbacks."
+            ),
+        },
         "latency_ms": latency_summary,
         "request_latency_ms": request_latency_summary,
         "input_tokens": {
@@ -628,6 +709,8 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"| Unsupported-claim phrase-match rate | {_format_percent(metrics['unsupported_claim_rate'])} |",
         f"| Requirement coverage | {_format_number(metrics['requirement_coverage'])} |",
         f"| Deterministic usefulness proxy | {_format_number(metrics['test_case_usefulness_score'])} |",
+        f"| Retry attempts | {metrics['reliability']['retry_attempt_count']} |",
+        f"| Fallback attempts | {metrics['reliability']['fallback_attempt_count']} |",
         f"| Average attempt latency (ms) | {_format_latency(metrics['latency_ms']['average'], metrics['latency_ms'].get('measurement'))} |",
         f"| Median attempt latency (ms) | {_format_latency(metrics['latency_ms']['median'], metrics['latency_ms'].get('measurement'))} |",
         f"| Average overall request latency (ms) | {_format_latency(metrics['request_latency_ms']['average'], metrics['request_latency_ms'].get('measurement'))} |",
@@ -638,11 +721,27 @@ def render_markdown_report(report: dict[str, Any]) -> str:
         f"| Total tokens (coverage) | {_format_total_coverage(metrics['total_tokens'])} |",
         f"| Estimated cost (coverage) | {_format_cost(metrics['estimated_cost'])} |",
         "",
+        "## Milestone 3 quality metrics",
+        "",
+        "| Metric | Numerator / denominator | Rate |",
+        "|---|---:|---:|",
+    ]
+    for name, metric in metrics.get("quality_metrics", {}).items():
+        lines.append(
+            f"| {name.replace('_', ' ')} | {metric.get('numerator', 0)} / "
+            f"{metric.get('denominator', 0)} | "
+            f"{_format_percent(metric.get('rate'))} |"
+        )
+    lines.extend([
+        "",
+        "Quality metric denominators exclude inapplicable examples; duplicate and "
+        "generation-failure rates are diagnostic rates, not quality scores.",
+        "",
         "## Per-example status",
         "",
         "| Example | Status | Structure valid | Evidence proxy | Usefulness proxy |",
         "|---|---|---:|---:|---:|",
-    ]
+    ])
     for result in report["results"]:
         scores = result.get("scores") or {}
         structure = scores.get("structured_output", {}).get(

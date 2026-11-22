@@ -283,22 +283,40 @@ def test_legacy_generate_content_preserves_success_and_failure_shapes(monkeypatc
         SimpleNamespace(text="answer", candidates=[], usage_metadata=None)
     )
     monkeypatch.setattr(llm_services, "get_default_provider", lambda: provider)
-    service = LLMService()
+    telemetry = SimpleNamespace(record_request=lambda _records: None)
+    service = LLMService(telemetry_service=telemetry)
     success = service.generate_content("system", "user", "application/json")
     assert success == {
         "success": True,
         "answer": "answer",
+        "provider": "gemini",
         "model": "test-model",
         "stage": "complete",
+        "fallback_configured": False,
+        "fallback_attempted": False,
+        "fallback_eligible": False,
+        "provider_attempt_count": 1,
+        "retry_count": 0,
     }
 
     failed_provider, _ = _provider(error=RuntimeError("private details"))
-    service = LLMService(provider=failed_provider)
+    service = LLMService(
+        provider=failed_provider,
+        telemetry_service=telemetry,
+    )
     failure = service.generate_content("system", "user")
     assert failure == {
         "success": False,
         "answer": "",
+        "provider": "gemini",
         "model": "test-model",
         "stage": "provider_request",
         "error": "Gemini provider request failed",
+        "error_category": "provider_api",
+        "error_type": "RuntimeError",
+        "fallback_configured": False,
+        "fallback_attempted": False,
+        "fallback_eligible": False,
+        "provider_attempt_count": 1,
+        "retry_count": 0,
     }

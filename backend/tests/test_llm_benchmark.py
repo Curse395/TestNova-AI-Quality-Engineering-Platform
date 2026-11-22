@@ -59,11 +59,13 @@ def test_default_dataset_loads_versioned_synthetic_examples_and_traceable_refs()
     dataset = load_dataset(DEFAULT_DATASET_PATH, expected_version="1.0.0")
 
     assert dataset.dataset_version == "1.0.0"
-    assert len(dataset.examples) == 5
+    assert len(dataset.examples) == 8
     assert {
         item.scenario_type for item in dataset.examples
     } >= {"positive", "negative", "boundary", "edge", "insufficient_evidence"}
     for example in dataset.examples:
+        assert example.difficulty in {"easy", "medium", "hard"}
+        assert example.evaluation_notes
         evidence = {item.id: item.content for item in example.evidence_chunks}
         for annotation in example.annotations:
             assert any(
@@ -339,7 +341,7 @@ def test_runner_handles_partial_failures_and_tracks_missing_usage():
     assert report["results"][1]["failure_category"] == "rate_limit"
     assert report["metrics"]["completed_examples"] == 1
     assert report["metrics"]["failed_examples"] == 1
-    assert report["metrics"]["skipped_examples"] == 3
+    assert report["metrics"]["skipped_examples"] == 6
     assert report["metrics"]["input_tokens"]["total"] is None
 
 
@@ -422,6 +424,70 @@ def test_live_metric_aggregation_reports_attempt_and_request_latency():
     assert metrics["request_latency_ms"]["median"] == 23.5
     assert metrics["failed_call_count"] == 1
     assert metrics["estimated_cost"]["total"] is None
+
+
+def test_aggregation_preserves_milestone_3_metrics_and_reliability_accounting():
+    quality_metrics = {
+        "requirement_coverage": {
+            "numerator": 1,
+            "denominator": 1,
+            "rate": 1.0,
+            "applicability": "applicable",
+        },
+        "step_completeness": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1.0,
+            "applicability": "applicable",
+        },
+    }
+    metrics = aggregate_results(
+        [
+            {
+                "status": "completed",
+                "scores": {
+                    "structured_output": {"valid": True},
+                    "evidence_accuracy": {"score": 1.0, "unsupported_claim_rate": 0.0},
+                    "requirement_coverage": {"score": 1.0},
+                    "usefulness": {"test_case_usefulness_score": 1.0},
+                    "quality_metrics": quality_metrics,
+                },
+                "overall_latency_ms": None,
+                "attempts": [
+                    {
+                        "success": False,
+                        "attempt_number": 1,
+                        "request_id": "req-1",
+                        "is_fallback_attempt": False,
+                        "fallback_attempted": True,
+                        "fallback_succeeded": True,
+                    },
+                    {
+                        "success": True,
+                        "attempt_number": 2,
+                        "request_id": "req-1",
+                        "is_fallback_attempt": True,
+                        "fallback_attempted": True,
+                        "fallback_succeeded": True,
+                    },
+                ],
+            }
+        ],
+        execution_mode="mocked",
+    )
+
+    assert metrics["quality_metrics"]["requirement_coverage"] == {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "applicability": "applicable",
+        "measured_example_count": 1,
+    }
+    assert metrics["quality_metrics"]["scenario_diversity"]["rate"] is None
+    assert metrics["reliability"]["retry_attempt_count"] == 1
+    assert metrics["reliability"]["fallback_attempt_count"] == 1
+    assert metrics["reliability"]["fallback_affected_request_count"] == 1
+    assert metrics["reliability"]["fallback_successful_request_count"] == 1
     assert metrics["input_tokens"]["total"] is None
 
 

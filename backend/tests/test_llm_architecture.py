@@ -234,8 +234,14 @@ def test_llm_service_injection_and_legacy_generate_content_compatibility(
     assert result == {
         "success": True,
         "answer": "legacy-compatible answer",
+        "provider": "fake",
         "model": "fake-model",
         "stage": "complete",
+        "fallback_configured": False,
+        "fallback_attempted": False,
+        "fallback_eligible": False,
+        "provider_attempt_count": 1,
+        "retry_count": 0,
     }
     assert provider.request.model == "fake-model"
     assert provider.request.provider == "fake"

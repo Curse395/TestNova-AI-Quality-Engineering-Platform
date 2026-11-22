@@ -37,6 +37,7 @@ class EvaluationExample(BaseModel):
         "edge",
         "insufficient_evidence",
     ]
+    difficulty: Literal["easy", "medium", "hard"]
     requirements_prompt: str = Field(min_length=1)
     evidence_chunks: list[EvidenceChunk] = Field(min_length=1)
     expected_requirement_coverage: list[str]
@@ -44,6 +45,7 @@ class EvaluationExample(BaseModel):
     unsupported_behaviors: list[str]
     annotations: list[ReferenceAnnotation]
     known_constraints: list[str]
+    evaluation_notes: list[str] = Field(min_length=1)
     scoring_guidance: str = Field(min_length=1)
 
     @model_validator(mode="after")

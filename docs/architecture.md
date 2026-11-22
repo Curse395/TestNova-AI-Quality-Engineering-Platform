@@ -348,6 +348,29 @@ dictionary shape at the compatibility boundary. Chat responses include source
 document/chunk identifiers and are persisted in chat history when generation
 succeeds.
 
+`AssistantQuestionRouter` sends direct project-data questions to
+`AssistantProjectIntelligenceService`, which reuses the owner-scoped analytics,
+workflow, execution, and release-readiness services. These read-only results
+are calculated in Python/database queries; clear count and comparison questions
+do not make an LLM call. Document results report embedding-record and chunk
+counts independently, and retrieval similarity is handled as a ranking score,
+not as a count. Ties and empty datasets are reported explicitly. Follow-up
+questions can use the current session's recent messages to resolve document
+references, while the selected project and authenticated user remain the
+authorization boundary. Mixed questions can combine structured results with
+retrieved document evidence; the verified data is separately supplied to the
+answer prompt and returned to the frontend with its source references.
+
+Platform architecture questions use `RepositoryArchitectureService`, separate
+from customer-document retrieval. It reads only an explicit allowlist of
+technical documentation and source files, scores relevant excerpts locally,
+redacts recognizable credential patterns, and never indexes environment files,
+virtual environments, dependencies, build output, or Git internals. Answers
+are grounded in those statically inspected excerpts and cite their repository
+paths; they do not represent live runtime inspection. Structured answer
+metadata lets the assistant UI distinguish calculated project data,
+retrieval similarity, and platform source evidence.
+
 ### LLM telemetry and performance monitoring
 
 The central `LLMRouter` records one telemetry event for each provider attempt,
