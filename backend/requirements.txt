@@ -1,6 +1,7 @@
 # Direct production dependencies used by backend/app.
 # Keep bounded compatibility ranges; transitive dependencies are resolved by pip.
 alembic==1.16.5
+bcrypt==4.0.1
 email-validator==2.3.0
 fastapi==0.136.1
 google-genai==1.33.0
