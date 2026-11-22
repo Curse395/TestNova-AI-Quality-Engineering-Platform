@@ -54,6 +54,55 @@ def test_agent_returns_generated_test_cases():
     )
 
 
+def test_agent_propagates_workflow_correlation_and_provider_attempts():
+    agent = GenerationAgent(db=Mock())
+    request = Mock(spec=GenerationRequest)
+    test_cases = [{"id": 14, "title": "Supported scenario"}]
+    agent.service.generate = Mock(return_value=test_cases)
+    agent.service.last_generation_stats = {
+        "generation_status": "completed",
+        "generated_count": 1,
+        "final_persisted_count": 1,
+        "correlation_id": "wf8-task12-gen3-example",
+        "workflow_id": 8,
+        "task_id": 12,
+        "generation_attempt_number": 3,
+        "response_diagnostics": [
+            {"provider": "gemini", "model": "gemini-test"}
+        ],
+    }
+
+    result = agent.run(
+        AgentContext(
+            user_id=1,
+            project_id=10,
+            task="test_generation",
+            inputs={
+                "request": request,
+                "workflow_attempt_number": 3,
+            },
+            metadata={"workflow_id": 8, "task_id": 12},
+        )
+    )
+
+    assert result.status == "success"
+    agent.service.generate.assert_called_once_with(
+        user_id=1,
+        project_id=10,
+        request=request,
+        workflow_run_id=8,
+        workflow_attempt_number=3,
+        reuse_existing_workflow_attempt=False,
+        workflow_task_id=12,
+    )
+    assert result.data["execution_metadata"]["correlation_id"] == (
+        "wf8-task12-gen3-example"
+    )
+    assert result.data["execution_metadata"]["provider_attempts"] == [
+        {"provider": "gemini", "model": "gemini-test"}
+    ]
+
+
 def test_agent_handles_generation_failure():
     agent = GenerationAgent(db=Mock())
     request = Mock(spec=GenerationRequest)

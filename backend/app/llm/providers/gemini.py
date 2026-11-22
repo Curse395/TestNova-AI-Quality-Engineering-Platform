@@ -14,6 +14,7 @@ from app.llm.contracts import (
     LLMGenerationRequest,
     LLMResponse,
 )
+from app.llm.retry import retry_after_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,14 @@ class GeminiProvider:
                 provider=self.provider_name,
                 model=model_name,
                 error_type=type(exc).__name__,
-                details={"transient": True} if transient else {},
+                details={
+                    **({"transient": True} if transient else {}),
+                    **(
+                        {"retry_after_seconds": delay}
+                        if (delay := retry_after_seconds(exc)) is not None
+                        else {}
+                    ),
+                },
             )
             logger.error(
                 "Gemini provider request failed: model=%s error_type=%s",

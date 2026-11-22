@@ -194,6 +194,14 @@ def start_workflow(
         task_types = Orchestrator.workflow_template(workflow_type)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    change_summary = input_data.get("change_summary")
+    if input_data.get("workflow_type") == "change_risk_analysis" and (
+        not isinstance(change_summary, str) or not change_summary.strip()
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Change summary is required for Change Risk Analysis.",
+        )
 
     active_workflows = (
         db.query(WorkflowRun)
@@ -204,7 +212,8 @@ def start_workflow(
         .all()
     )
     for candidate in active_workflows:
-        if WorkflowService.mark_interrupted(candidate):
+        reconciled = WorkflowService.reconcile_terminal(candidate)
+        if reconciled or WorkflowService.mark_interrupted(candidate):
             db.commit()
     active = next(
         (
@@ -285,7 +294,8 @@ def list_workflows(
         .all()
     )
     for workflow in workflows:
-        if WorkflowService.mark_interrupted(workflow):
+        reconciled = WorkflowService.reconcile_terminal(workflow)
+        if reconciled or WorkflowService.mark_interrupted(workflow):
             db.commit()
     return {
         "success": True,
@@ -301,7 +311,8 @@ def get_workflow(
     db: Session = Depends(get_db),
 ):
     workflow = _authorized_workflow(db, current_user.id, project_id, workflow_id)
-    if WorkflowService.mark_interrupted(workflow):
+    reconciled = WorkflowService.reconcile_terminal(workflow)
+    if reconciled or WorkflowService.mark_interrupted(workflow):
         db.commit()
     return {"success": True, "data": _workflow_payload(workflow)}
 
@@ -314,7 +325,8 @@ def list_workflow_tasks(
     db: Session = Depends(get_db),
 ):
     workflow = _authorized_workflow(db, current_user.id, project_id, workflow_id)
-    if WorkflowService.mark_interrupted(workflow):
+    reconciled = WorkflowService.reconcile_terminal(workflow)
+    if reconciled or WorkflowService.mark_interrupted(workflow):
         db.commit()
     tasks = (
         db.query(WorkflowTask)
@@ -377,6 +389,8 @@ def resume_workflow(
     )
     if workflow is None:
         raise HTTPException(status_code=404, detail="Workflow not found.")
+    if WorkflowService.reconcile_terminal(workflow):
+        db.commit()
     WorkflowService.mark_interrupted(workflow)
     if workflow.status == "running":
         raise HTTPException(
@@ -409,6 +423,7 @@ def resume_workflow(
             and generation_output.get("status") == "completed"
             and isinstance(structured_generation, dict)
             and isinstance(structured_generation.get("test_cases"), list)
+            and bool(structured_generation["test_cases"])
         ):
             generation_task.status = "completed"
             generation_task.error_details = None

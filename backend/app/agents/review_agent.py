@@ -1,6 +1,13 @@
 
 import logging
 
+from sqlalchemy.exc import (
+    DBAPIError,
+    DisconnectionError,
+    OperationalError,
+    TimeoutError as SQLAlchemyTimeoutError,
+)
+
 from app.agents.base import BaseAgent
 from app.agents.contracts import AgentContext, AgentResult
 from app.services.test_case_evaluation_service import (
@@ -8,6 +15,22 @@ from app.services.test_case_evaluation_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable_review_exception(error: Exception) -> bool:
+    """Retry only failures that can plausibly recover without changing input."""
+    if isinstance(
+        error,
+        (
+            TimeoutError,
+            ConnectionError,
+            DisconnectionError,
+            OperationalError,
+            SQLAlchemyTimeoutError,
+        ),
+    ):
+        return True
+    return isinstance(error, DBAPIError) and error.connection_invalidated
 
 
 class ReviewAgent(BaseAgent):
@@ -35,6 +58,7 @@ class ReviewAgent(BaseAgent):
                 error={
                     "code": "INVALID_TEST_CASE_ID",
                     "message": "A valid test case ID is required.",
+                    "retryable": False,
                 },
             )
 
@@ -151,6 +175,7 @@ class ReviewAgent(BaseAgent):
                 error={
                     "code": "REVIEW_TARGET_NOT_FOUND",
                     "message": str(exc) or "The project or test case could not be accessed.",
+                    "retryable": False,
                 },
             )
 
@@ -166,5 +191,7 @@ class ReviewAgent(BaseAgent):
                 error={
                     "code": "REVIEW_FAILED",
                     "message": str(exc) or "The test case review could not be completed.",
+                    "error_type": type(exc).__name__,
+                    "retryable": _is_retryable_review_exception(exc),
                 },
             )

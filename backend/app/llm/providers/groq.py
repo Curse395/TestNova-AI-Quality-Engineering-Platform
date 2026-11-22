@@ -19,6 +19,7 @@ from app.llm.contracts import (
     LLMGenerationRequest,
     LLMResponse,
 )
+from app.llm.retry import retry_after_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ class GroqProvider:
         *,
         error_type: str | None = None,
         transient: bool = False,
+        retry_after: float | None = None,
     ) -> LLMResponse:
         error = LLMError(
             category=category,
@@ -108,7 +110,14 @@ class GroqProvider:
             provider="groq",
             model=request.model,
             error_type=error_type,
-            details={"transient": True} if transient else {},
+            details={
+                **({"transient": True} if transient else {}),
+                **(
+                    {"retry_after_seconds": retry_after}
+                    if retry_after is not None
+                    else {}
+                ),
+            },
         )
         return LLMResponse(
             provider="groq",
@@ -167,6 +176,7 @@ class GroqProvider:
                 "provider_request",
                 error_type=type(exc).__name__,
                 transient=transient,
+                retry_after=retry_after_seconds(exc),
             )
 
         usage_metadata = self._usage(response)

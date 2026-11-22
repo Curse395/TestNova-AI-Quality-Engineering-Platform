@@ -4,6 +4,7 @@ import contextvars
 import json
 import logging
 import re
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -46,7 +47,9 @@ def configure_structured_logging() -> None:
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     if not root.handlers:
-        root.addHandler(logging.StreamHandler())
+        # Uvicorn/dev consoles commonly capture stdout as their primary stream.
+        # Make the structured application diagnostics visible there explicitly.
+        root.addHandler(logging.StreamHandler(sys.stdout))
     for handler in root.handlers:
         handler.setFormatter(JsonLogFormatter())
 

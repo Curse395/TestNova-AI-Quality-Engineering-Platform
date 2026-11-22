@@ -18,6 +18,7 @@ from app.core.rate_limit import InMemoryRateLimiter
 from app.core.request_context import (
     JsonLogFormatter,
     RequestContextMiddleware,
+    configure_structured_logging,
     request_id_context,
 )
 
@@ -270,6 +271,27 @@ def test_structured_log_formatter_redacts_credentials_and_includes_request_id():
     assert "private-token" not in formatted
     assert "password=secret" not in formatted
     assert "[REDACTED]" in payload["message"]
+
+
+def test_structured_application_diagnostics_are_written_to_stdout(capsys):
+    root = logging.getLogger()
+    original_handlers = root.handlers[:]
+    original_level = root.level
+    try:
+        root.handlers = []
+        configure_structured_logging()
+        logging.getLogger("app.api.analytics").warning(
+            "Quality summary API result: project_id=2 status=unavailable "
+            "failure_category=structured_output_invalid"
+        )
+        output = capsys.readouterr().out
+    finally:
+        root.handlers = original_handlers
+        root.setLevel(original_level)
+
+    assert '"level": "WARNING"' in output
+    assert '"logger": "app.api.analytics"' in output
+    assert "failure_category=structured_output_invalid" in output
 
 
 def test_request_context_middleware_sets_response_header_and_resets_context():

@@ -24,6 +24,7 @@ import {
   workflowGeneratedCases,
   workflowTestCasesPageUrl,
 } from './workflowPresentation'
+import { workflowStartValidationError } from './workflowValidation'
 
 const workflowTypes = [
   { value: 'full_qa_workflow', label: 'Full QA workflow' },
@@ -580,6 +581,7 @@ const WorkflowsPage = () => {
   const [maxCases, setMaxCases] = useState(5)
   const [categories, setCategories] = useState(['positive', 'negative', 'boundary', 'edge'])
   const [changeSummary, setChangeSummary] = useState('')
+  const [changeSummaryError, setChangeSummaryError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadingWorkflows, setLoadingWorkflows] = useState(false)
   const [loadingDetails, setLoadingDetails] = useState({})
@@ -750,6 +752,9 @@ const WorkflowsPage = () => {
 
   const handleStart = async (event) => {
     event.preventDefault()
+    const validationError = workflowStartValidationError(workflowType, changeSummary)
+    setChangeSummaryError(validationError)
+    if (validationError) return
     if (!projectId || submittingRef.current || hasActiveWorkflow) return
     const requestedProjectId = projectId
     submittingRef.current = true
@@ -792,6 +797,10 @@ const WorkflowsPage = () => {
     try {
       await resumeWorkflow(Number(requestedProjectId), workflowId)
       await refresh()
+      // A resumed workflow can finish in the same terminal status it had before
+      // resumption. The history refresh only reloads details when status changes,
+      // so explicitly fetch this run to show its latest attempts and outputs.
+      await loadDetails(requestedProjectId, workflowId, true)
     } catch (requestError) {
       if (isCurrentWorkflowProject(requestedProjectId, selectedProjectRef.current)) {
         setError(getApiErrorMessage(requestError, 'Workflow could not be resumed.'))
@@ -855,7 +864,13 @@ const WorkflowsPage = () => {
                 Workflow type
                 <select
                   value={workflowType}
-                  onChange={(event) => setWorkflowType(event.target.value)}
+                  onChange={(event) => {
+                    const nextWorkflowType = event.target.value
+                    setWorkflowType(nextWorkflowType)
+                    setChangeSummaryError(
+                      workflowStartValidationError(nextWorkflowType, changeSummary),
+                    )
+                  }}
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
                 >
                   {workflowTypes.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -916,14 +931,28 @@ const WorkflowsPage = () => {
                 <label className="text-sm text-slate-300 md:col-span-2">
                   Change summary (required for change-risk analysis)
                   <textarea
+                    id="change-summary"
                     value={changeSummary}
-                    onChange={(event) => setChangeSummary(event.target.value)}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setChangeSummary(value)
+                      setChangeSummaryError(
+                        workflowStartValidationError(workflowType, value),
+                      )
+                    }}
                     maxLength={5000}
                     minLength={10}
+                    aria-invalid={Boolean(changeSummaryError)}
+                    aria-describedby={changeSummaryError ? 'change-summary-error' : undefined}
                     rows={2}
                     className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
                     placeholder="Describe the software change to analyze."
                   />
+                  {changeSummaryError && (
+                    <span id="change-summary-error" role="alert" className="mt-1 block text-xs text-rose-300">
+                      {changeSummaryError}
+                    </span>
+                  )}
                 </label>
               )}
               <div className="md:col-span-2">

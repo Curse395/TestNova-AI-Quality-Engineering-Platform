@@ -1,12 +1,15 @@
 import logging
+import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, wait
 from copy import deepcopy
 from datetime import datetime, timedelta
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any
 
 from sqlalchemy import and_, or_, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.agents.bug_analysis_agent import BugAnalysisAgent
@@ -30,6 +33,10 @@ from app.models.workflow_run import WorkflowRun
 from app.models.workflow_task import WorkflowTask
 from app.models.workflow_task_attempt import WorkflowTaskAttempt
 from app.models.test_case_generation_run import TestCaseGenerationRun
+from app.models.test_case import TestCase
+from app.models.project_requirement import ProjectRequirement
+from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.schemas.test_case_schema import TestCaseGenerationRequest
 from app.services.workflow_validation_service import WorkflowValidationService
 
@@ -37,6 +44,10 @@ logger = logging.getLogger(__name__)
 
 MAX_REGENERATIONS = 2
 MAX_GENERATION_ATTEMPTS = MAX_REGENERATIONS + 1
+# The LLM router allows one retry per provider. Keep review-stage recovery to
+# the same single additional attempt; model calls retain the router's policy.
+MAX_REVIEW_RETRIES = 1
+REVIEW_RETRY_DELAY_SECONDS = 0.25
 INTERRUPTED_AFTER = timedelta(minutes=10)
 SUCCESSFUL_TASK_STATUSES = {"completed"}
 TERMINAL_TASK_STATUSES = {"completed", "partial", "skipped", "failed"}
@@ -66,12 +77,17 @@ def _jsonable_agent_result(result: AgentResult) -> dict[str, Any]:
         "failed": "failed",
         "skipped": "skipped",
     }[result.status]
+    findings = result.data.get("findings", [])
+    if result.agent_name == "bug_analysis_agent":
+        findings = result.data.get("bugs", findings)
+    elif result.agent_name == "requirements_analysis_agent":
+        findings = result.data.get("requirements", findings)
     return AgentOutput(
         agent_name=result.agent_name,
         status=status,
         structured_data=result.data,
         evidence_references=result.evidence,
-        findings=result.data.get("findings", []),
+        findings=findings,
         warnings=result.data.get("warnings", []),
         errors=[result.error] if result.error else [],
         execution_metadata=result.data.get("execution_metadata", {}),
@@ -154,9 +170,104 @@ def _finish_attempt(
     db.commit()
 
 
+def _workflow_completion_status(
+    tasks: list[WorkflowTask],
+    task_results: dict[str, Any],
+) -> tuple[str, int]:
+    statuses = [task.status for task in tasks if task.task_type != "aggregation"]
+    failures = sum(
+        task.status == "failed"
+        or (
+            task.status == "skipped"
+            and isinstance(task.error_details, dict)
+            and task.error_details.get("code") == "DEPENDENCY_NOT_SATISFIED"
+        )
+        for task in tasks
+        if task.task_type != "aggregation"
+    )
+    partial_outputs = any(
+        output.get("status") == "partial"
+        for output in task_results.values()
+        if isinstance(output, dict)
+    ) or any(status == "partial" for status in statuses)
+    if failures and failures == len(statuses):
+        return "failed", failures
+    if failures or partial_outputs:
+        return "partially_completed", failures
+    return "completed", failures
+
+
 class WorkflowService:
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def reconcile_terminal(workflow: WorkflowRun) -> bool:
+        if workflow.status not in {"pending", "running"} or not workflow.tasks:
+            return False
+        if any(task.status not in TERMINAL_TASK_STATUSES for task in workflow.tasks):
+            return False
+
+        task_results = {
+            task.task_type: task.output_data
+            for task in workflow.tasks
+            if task.task_type != "aggregation" and isinstance(task.output_data, dict)
+        }
+        aggregation = next(
+            (task for task in workflow.tasks if task.task_type == "aggregation"),
+            None,
+        )
+        aggregation_output = (
+            aggregation.output_data
+            if aggregation is not None and isinstance(aggregation.output_data, dict)
+            else {}
+        )
+        aggregated_results = aggregation_output.get("results")
+        if isinstance(aggregated_results, dict):
+            task_results = {**task_results, **aggregated_results}
+        if aggregation is not None and isinstance(aggregation.output_data, dict):
+            task_results["aggregation"] = aggregation.output_data
+
+        existing_output = (
+            workflow.final_output
+            if isinstance(workflow.final_output, dict)
+            else {}
+        )
+        workflow_context = existing_output.get(
+            "workflow_context",
+            aggregation_output.get("workflow_context", {}),
+        )
+        workflow_approval = existing_output.get(
+            "workflow_approval",
+            aggregation_output.get(
+                "workflow_approval",
+                workflow_context.get("workflow_approval", "not_applicable")
+                if isinstance(workflow_context, dict)
+                else "not_applicable",
+            ),
+        )
+        workflow.final_output = {
+            **existing_output,
+            "workflow_context": workflow_context,
+            "results": {**existing_output.get("results", {}), **task_results}
+            if isinstance(existing_output.get("results"), dict)
+            else task_results,
+            "workflow_approval": workflow_approval,
+        }
+
+        workflow.status, failures = _workflow_completion_status(
+            workflow.tasks,
+            task_results,
+        )
+        now = datetime.utcnow()
+        workflow.completed_at = workflow.completed_at or now
+        workflow.updated_at = now
+        workflow.error_summary = (
+            f"{failures} workflow task(s) failed or were blocked."
+            if failures
+            else None
+        )
+        return True
 
     @staticmethod
     def create_tasks(
@@ -329,6 +440,120 @@ def _store_result(
     return output
 
 
+def _persist_extracted_requirements(
+    db: Session,
+    project_id: int,
+    result: AgentResult,
+) -> int:
+    """Upsert validated, explicit, numbered requirements from agent output."""
+    if result.status not in {"success", "partial"}:
+        return 0
+    requirements = result.data.get("requirements")
+    if not isinstance(requirements, list):
+        return 0
+    evidence_by_chunk = {
+        item.get("chunk_id"): item
+        for item in result.evidence
+        if isinstance(item, dict) and isinstance(item.get("chunk_id"), int)
+    }
+    requirement_ids = {
+        chunk_id
+        for item in requirements
+        if isinstance(item, dict)
+        for chunk_id in item.get("evidence_chunk_ids", [])
+        if isinstance(chunk_id, int) and not isinstance(chunk_id, bool)
+    }
+    owned_chunk_ids = {
+        row[0]
+        for row in (
+            db.query(DocumentChunk.id)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .filter(
+                Document.project_id == project_id,
+                DocumentChunk.id.in_(requirement_ids or {-1}),
+            )
+            .all()
+        )
+    }
+    persisted = 0
+    for item in requirements:
+        if not isinstance(item, dict) or item.get("classification") != "explicit":
+            continue
+        key = item.get("id")
+        description = item.get("description")
+        cited = item.get("evidence_chunk_ids")
+        if (
+            not isinstance(key, str)
+            or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*[0-9]+", key)
+            or not isinstance(description, str)
+            or not description.strip()
+            or not isinstance(cited, list)
+            or not cited
+            or any(not isinstance(chunk_id, int) or isinstance(chunk_id, bool) for chunk_id in cited)
+            or not set(cited).issubset(owned_chunk_ids)
+            or not set(cited).issubset(evidence_by_chunk)
+            or not re.search(
+                rf"(?<![A-Za-z0-9_-]){re.escape(key.casefold())}(?![A-Za-z0-9_-])",
+                " ".join(
+                    str(evidence_by_chunk[chunk_id].get("content") or "")
+                    for chunk_id in cited
+                ).casefold(),
+            )
+        ):
+            continue
+        row = (
+            db.query(ProjectRequirement)
+            .filter(
+                ProjectRequirement.project_id == project_id,
+                ProjectRequirement.requirement_key == key,
+            )
+            .with_for_update()
+            .first()
+        )
+        evidence_ids = list(dict.fromkeys((row.evidence_chunk_ids or []) + cited)) if row else list(dict.fromkeys(cited))
+        values = dict(
+                project_id=project_id,
+                requirement_key=key,
+                description=description.strip(),
+                classification="explicit",
+                evidence_chunk_ids=evidence_ids,
+            )
+        dialect = db.get_bind().dialect.name
+        if dialect == "postgresql":
+            statement = pg_insert(ProjectRequirement).values(**values)
+            statement = statement.on_conflict_do_update(
+                constraint="uq_project_requirements_project_key",
+                set_={
+                    "description": statement.excluded.description,
+                    "classification": statement.excluded.classification,
+                    "evidence_chunk_ids": statement.excluded.evidence_chunk_ids,
+                    "updated_at": datetime.utcnow(),
+                },
+            )
+            db.execute(statement)
+        elif dialect == "sqlite":
+            statement = sqlite_insert(ProjectRequirement).values(**values)
+            statement = statement.on_conflict_do_update(
+                index_elements=["project_id", "requirement_key"],
+                set_={
+                    "description": statement.excluded.description,
+                    "classification": statement.excluded.classification,
+                    "evidence_chunk_ids": statement.excluded.evidence_chunk_ids,
+                    "updated_at": datetime.utcnow(),
+                },
+            )
+            db.execute(statement)
+        else:
+            if row is None:
+                db.add(ProjectRequirement(**values))
+            else:
+                row.description = description.strip()
+                row.classification = "explicit"
+                row.evidence_chunk_ids = evidence_ids
+        persisted += 1
+    return persisted
+
+
 def _requirements_prompt(
     workflow: WorkflowRun,
     shared_context: dict[str, Any],
@@ -338,15 +563,24 @@ def _requirements_prompt(
     statements = []
     if isinstance(supplied, str) and supplied.strip():
         statements.append(f"User focus:\n{supplied.strip()}")
-    for field in ("requirements", "acceptance_criteria"):
+    for field in (
+        "requirements",
+        "acceptance_criteria",
+        "non_functional_requirements",
+    ):
         for item in requirements.get(field, []):
             if isinstance(item, dict) and isinstance(item.get("description"), str):
                 classification = item.get("classification")
                 label = (
                     f"{classification.capitalize()} requirement"
                     if field == "requirements" and classification in {"explicit", "inferred"}
+                    else "Non-functional requirement"
+                    if field == "non_functional_requirements"
                     else "Acceptance criterion"
                 )
+                requirement_id = item.get("id")
+                if field == "requirements" and isinstance(requirement_id, str):
+                    label = f"{label} {requirement_id.strip()}"
                 statements.append(f"{label}: {item['description'].strip()}")
     request = workflow.input_data.get("request")
     if not statements and isinstance(request, str) and request.strip():
@@ -371,8 +605,98 @@ def _requirements_prompt(
     return combined[:10000]
 
 
+def _generation_requirement_definitions(
+    workflow: WorkflowRun,
+    shared_context: dict[str, Any],
+) -> list[dict[str, Any]]:
+    definitions: dict[str, dict[str, Any]] = {}
+    analyzed = shared_context.get("requirements", {})
+    extracted = analyzed.get("requirements", []) if isinstance(analyzed, dict) else []
+    for requirement in extracted:
+        if not isinstance(requirement, dict):
+            continue
+        key = requirement.get("id")
+        description = requirement.get("description")
+        evidence_chunk_ids = requirement.get("evidence_chunk_ids")
+        if (
+            requirement.get("classification") == "inferred"
+            or not isinstance(key, str)
+            or not key.strip()
+            or not isinstance(description, str)
+            or not description.strip()
+            or not isinstance(evidence_chunk_ids, list)
+            or not evidence_chunk_ids
+            or any(
+                not isinstance(chunk_id, int)
+                or isinstance(chunk_id, bool)
+                or chunk_id < 1
+                for chunk_id in evidence_chunk_ids
+            )
+        ):
+            continue
+        definitions[key.strip()] = {
+            "requirement_key": key.strip(),
+            "description": description.strip(),
+            "evidence_chunk_ids": list(dict.fromkeys(evidence_chunk_ids)),
+        }
+
+    supplied = workflow.input_data.get("requirements", [])
+    if isinstance(supplied, list):
+        for requirement in supplied:
+            if not isinstance(requirement, dict):
+                continue
+            key = requirement.get("requirement_key")
+            description = requirement.get("description")
+            evidence_chunk_ids = requirement.get("evidence_chunk_ids", [])
+            if (
+                not isinstance(key, str)
+                or not key.strip()
+                or not isinstance(description, str)
+                or not description.strip()
+                or not isinstance(evidence_chunk_ids, list)
+            ):
+                continue
+            definitions.setdefault(
+                key.strip(),
+                {
+                    "requirement_key": key.strip(),
+                    "description": description.strip(),
+                    "evidence_chunk_ids": evidence_chunk_ids,
+                },
+            )
+    return list(definitions.values())
+
+
 def _task_by_type(tasks: list[WorkflowTask], task_type: str) -> WorkflowTask | None:
     return next((task for task in tasks if task.task_type == task_type), None)
+
+
+def _persisted_successful_reviews(
+    review_task: WorkflowTask,
+    case_ids: list[int],
+) -> dict[int, dict[str, Any]]:
+    """Recover completed per-case review results from task and attempt outputs."""
+    expected_case_ids = set(case_ids)
+    recovered: dict[int, dict[str, Any]] = {}
+    outputs = [
+        attempt.output_data
+        for attempt in sorted(review_task.attempts, key=lambda item: item.attempt_number)
+    ]
+    outputs.append(review_task.output_data)
+    for output in outputs:
+        if not isinstance(output, dict) or not isinstance(output.get("reviews"), list):
+            continue
+        for review in output["reviews"]:
+            if not isinstance(review, dict) or review.get("status") not in {
+                "completed",
+                "success",
+            }:
+                continue
+            structured = review.get("structured_data")
+            case_id = structured.get("test_case_id") if isinstance(structured, dict) else None
+            if isinstance(case_id, int) and not isinstance(case_id, bool) and case_id in expected_case_ids:
+                recovered[case_id] = review
+    return recovered
 
 
 def _generation_run_exists(
@@ -392,6 +716,79 @@ def _generation_run_exists(
     )
 
 
+def _latest_persisted_generation_output(
+    db: Session,
+    workflow_id: int,
+    project_id: int,
+    generation_task_id: int,
+) -> dict[str, Any] | None:
+    """Find the newest successful generation attempt whose cases are still saved."""
+    attempts = (
+        db.query(WorkflowTaskAttempt)
+        .filter(
+            WorkflowTaskAttempt.workflow_task_id == generation_task_id,
+            WorkflowTaskAttempt.status.in_(("completed", "partial")),
+        )
+        .order_by(WorkflowTaskAttempt.attempt_number.desc())
+        .all()
+    )
+    for attempt in attempts:
+        output = attempt.output_data
+        if not isinstance(output, dict) or output.get("status") not in {
+            "completed",
+            "partial",
+        }:
+            continue
+        metadata = output.get("execution_metadata")
+        generation_number = (
+            metadata.get("generation_attempt_number")
+            if isinstance(metadata, dict)
+            else None
+        )
+        structured = output.get("structured_data")
+        cases = structured.get("test_cases") if isinstance(structured, dict) else None
+        case_ids = [
+            case.get("id")
+            for case in cases or []
+            if isinstance(case, dict)
+            and isinstance(case.get("id"), int)
+            and not isinstance(case.get("id"), bool)
+        ]
+        if (
+            not isinstance(generation_number, int)
+            or not isinstance(cases, list)
+            or not case_ids
+            or len(case_ids) != len(cases)
+            or len(set(case_ids)) != len(case_ids)
+        ):
+            continue
+        generation_run = (
+            db.query(TestCaseGenerationRun)
+            .filter(
+                TestCaseGenerationRun.workflow_run_id == workflow_id,
+                TestCaseGenerationRun.workflow_attempt_number == generation_number,
+                TestCaseGenerationRun.status.in_(("completed", "partial")),
+                TestCaseGenerationRun.final_persisted_count >= len(case_ids),
+            )
+            .first()
+        )
+        if generation_run is None:
+            continue
+        persisted_case_ids = {
+            row[0]
+            for row in db.query(TestCase.id)
+            .filter(
+                TestCase.id.in_(case_ids),
+                TestCase.project_id == project_id,
+                TestCase.generation_run_id == generation_run.id,
+            )
+            .all()
+        }
+        if persisted_case_ids == set(case_ids):
+            return output
+    return None
+
+
 def _dependency_succeeded(task: WorkflowTask, dependent_type: str) -> bool:
     if dependent_type == "aggregation" and task.status in {
         "completed",
@@ -402,6 +799,41 @@ def _dependency_succeeded(task: WorkflowTask, dependent_type: str) -> bool:
         return True
     if task.status in SUCCESSFUL_TASK_STATUSES:
         return True
+    if (
+        dependent_type == "test_generation"
+        and task.task_type == "bug_analysis"
+        and task.status == "partial"
+    ):
+        output = task.output_data or {}
+        structured = (
+            output.get("structured_data", {})
+            if isinstance(output, dict)
+            else {}
+        )
+        return (
+            isinstance(structured, dict)
+            and isinstance(structured.get("bugs"), list)
+            and bool(structured["bugs"])
+        )
+    if (
+        dependent_type == "test_generation"
+        and task.task_type == "requirements_analysis"
+        and task.status == "partial"
+    ):
+        output = task.output_data or {}
+        structured = (
+            output.get("structured_data", {})
+            if isinstance(output, dict)
+            else {}
+        )
+        return (
+            isinstance(structured, dict)
+            and any(
+                isinstance(structured.get(field), list)
+                and bool(structured[field])
+                for field in ("requirements", "acceptance_criteria")
+            )
+        )
     if (
         dependent_type == "test_generation"
         and task.task_type == "bug_analysis"
@@ -542,7 +974,7 @@ def _execute_generation_review(
         categories=workflow.input_data.get(
             "categories", ["positive", "negative", "boundary", "edge"]
         ),
-        requirements=workflow.input_data.get("requirements", []),
+        requirements=_generation_requirement_definitions(workflow, shared_context),
     )
     persisted_feedback = workflow.input_data.get("generation_feedback", [])
     persisted_feedback = (
@@ -733,8 +1165,14 @@ def _execute_generation_review(
             }
             if generation_result.status == "failed":
                 committed_result_recovery = False
+                is_empty_generation = (
+                    isinstance(generation_result.error, dict)
+                    and generation_result.error.get("code")
+                    == "NO_USABLE_TEST_CASES"
+                )
                 if (
-                    _generation_run_exists(db, workflow.id, generation_number)
+                    not is_empty_generation
+                    and _generation_run_exists(db, workflow.id, generation_number)
                 ):
                     generation_result = orchestrator.route(
                         _agent_context(
@@ -772,6 +1210,23 @@ def _execute_generation_review(
                 )
                 generation_error = generation_result.error or {}
                 if (
+                    is_empty_generation
+                    and generation_number < MAX_GENERATION_ATTEMPTS
+                ):
+                    persisted_feedback = _record_generation_feedback(
+                        db,
+                        workflow,
+                        [
+                            generation_error.get(
+                                "message",
+                                "No usable test cases were generated. Reassess the "
+                                "supplied requirements and project evidence without "
+                                "adding unsupported behavior.",
+                            )
+                        ],
+                    )
+                    _apply_generation_feedback(request, prompt, persisted_feedback)
+                if (
                     generation_error.get("stage")
                     in {"existing_case_duplicate", "generated_case_duplicate"}
                     and generation_number < MAX_GENERATION_ATTEMPTS
@@ -794,8 +1249,75 @@ def _execute_generation_review(
                     and not committed_result_recovery
                 ):
                     continue
-                last_result = generated_output
-                break
+                prior_generation_output = _latest_persisted_generation_output(
+                    db,
+                    workflow.id,
+                    workflow.project_id,
+                    generation_task.id,
+                )
+                if prior_generation_output is not None:
+                    prior_structured = prior_generation_output["structured_data"]
+                    prior_status = prior_generation_output["status"]
+                    generation_task.output_data = prior_generation_output
+                    generation_task.status = prior_status
+                    generation_task.error_details = None
+                    generation_task.completed_at = datetime.utcnow()
+                    generation_task.updated_at = datetime.utcnow()
+                    workflow.updated_at = datetime.utcnow()
+                    db.commit()
+                    generated_output = prior_generation_output
+                    generation_result = AgentResult(
+                        agent_name=prior_generation_output.get(
+                            "agent_name", TASK_AGENT_NAMES["test_generation"]
+                        ),
+                        status="partial" if prior_status == "partial" else "success",
+                        data=prior_structured,
+                        evidence=prior_generation_output.get("evidence_references", []),
+                    )
+                    recovering_completed_generation = True
+                else:
+                    last_result = generated_output
+                    if is_empty_generation and validation_task is not None:
+                        validation_attempt = _start_attempt(db, validation_task)
+                        validation = WorkflowValidationService(db).validate(
+                            user_id=workflow.initiated_by,
+                            project_id=workflow.project_id,
+                            test_case_ids=[],
+                        )
+                        validation_output = {
+                            "status": "completed" if validation["valid"] else "failed",
+                            "valid": validation["valid"],
+                            "findings": validation["findings"],
+                            "validated_case_ids": validation["validated_case_ids"],
+                        }
+                        validation_error = (
+                            None
+                            if validation["valid"]
+                            else {
+                                "code": "VALIDATION_FAILED",
+                                "message": "Deterministic validation rejected the empty generated-case list.",
+                            }
+                        )
+                        _finish_attempt(
+                            db,
+                            validation_task,
+                            validation_attempt,
+                            "completed" if validation["valid"] else "failed",
+                            validation_output,
+                            error=validation_error,
+                        )
+                        last_result = {
+                            **generated_output,
+                            "status": "failed",
+                            "test_cases": [],
+                            "generation_stats": generation_result.data.get(
+                                "generation_stats",
+                                {},
+                            ),
+                            "validation": validation_output,
+                            "review": {},
+                        }
+                    break
 
             if not recovering_completed_generation:
                 _finish_attempt(
@@ -808,6 +1330,7 @@ def _execute_generation_review(
                     generated_output,
                 )
             generated_cases = generation_result.data.get("test_cases", [])
+            generation_stats = generation_result.data.get("generation_stats", {})
             case_ids = [
                 case.get("id")
                 for case in generated_cases
@@ -856,8 +1379,9 @@ def _execute_generation_review(
             }
             if not validation["valid"]:
                 last_result = {
-                    "status": "completed",
+                    "status": "failed",
                     "test_cases": generated_cases,
+                    "generation_stats": generation_stats,
                     "validation": validation_output,
                     "review": {},
                 }
@@ -878,21 +1402,107 @@ def _execute_generation_review(
 
             if review_task is not None:
                 review_attempt = _start_attempt(db, review_task)
-                reviews = []
-                review_failed = False
-                for case_id in case_ids:
-                    review_result = orchestrator.route(
-                        _agent_context(
-                            workflow,
-                            "review",
-                            shared_context,
-                            review_task.id,
-                            {"test_case_id": case_id},
+                reviews_by_case_id = _persisted_successful_reviews(
+                    review_task,
+                    case_ids,
+                )
+                review_case_ids = [
+                    case_id for case_id in case_ids
+                    if case_id not in reviews_by_case_id
+                ]
+                review_retry_number = 0
+                while True:
+                    retryable_case_ids = []
+                    for case_id in review_case_ids:
+                        review_result = orchestrator.route(
+                            _agent_context(
+                                workflow,
+                                "review",
+                                shared_context,
+                                review_task.id,
+                                {"test_case_id": case_id},
+                            )
                         )
+                        serialized_review = _jsonable_agent_result(review_result)
+                        reviews_by_case_id[case_id] = serialized_review
+                        errors = serialized_review.get("errors", [])
+                        retryable = (
+                            review_result.status == "failed"
+                            and bool(errors)
+                            and isinstance(errors[0], dict)
+                            and errors[0].get("retryable") is True
+                        )
+                        if retryable:
+                            retryable_case_ids.append(case_id)
+
+                        progress_output = {
+                            "status": "running",
+                            "reviews": [
+                                reviews_by_case_id[reviewed_id]
+                                for reviewed_id in case_ids
+                                if reviewed_id in reviews_by_case_id
+                            ],
+                            "reviewed_case_ids": [
+                                reviewed_id
+                                for reviewed_id in case_ids
+                                if reviewed_id in reviews_by_case_id
+                            ],
+                            "pending_case_ids": [
+                                pending_id
+                                for pending_id in review_case_ids
+                                if pending_id not in reviews_by_case_id
+                            ],
+                        }
+                        review_attempt.output_data = progress_output
+                        review_task.output_data = progress_output
+                        db.commit()
+
+                    if (
+                        not retryable_case_ids
+                        or review_retry_number >= MAX_REVIEW_RETRIES
+                    ):
+                        break
+
+                    retry_errors = [
+                        error
+                        for case_id in retryable_case_ids
+                        for error in reviews_by_case_id[case_id].get("errors", [])
+                        if isinstance(error, dict)
+                    ]
+                    retry_error = retry_errors[0] if retry_errors else {
+                        "code": "REVIEW_FAILED",
+                        "message": "A transient review execution failure occurred.",
+                        "retryable": True,
+                    }
+                    _finish_attempt(
+                        db,
+                        review_task,
+                        review_attempt,
+                        "retrying",
+                        {
+                            "status": "retrying",
+                            "reviews": [
+                                reviews_by_case_id[case_id]
+                                for case_id in case_ids
+                                if case_id in reviews_by_case_id
+                            ],
+                            "retrying_case_ids": retryable_case_ids,
+                        },
+                        error=retry_error,
                     )
-                    reviews.append(_jsonable_agent_result(review_result))
-                    if review_result.status == "failed":
-                        review_failed = True
+                    sleep(REVIEW_RETRY_DELAY_SECONDS)
+                    review_attempt = _start_attempt(db, review_task)
+                    review_case_ids = retryable_case_ids
+                    review_retry_number += 1
+
+                reviews = [
+                    reviews_by_case_id[case_id]
+                    for case_id in case_ids
+                    if case_id in reviews_by_case_id
+                ]
+                review_failed = any(
+                    item.get("status") == "failed" for item in reviews
+                )
                 requires_revision = review_failed or any(
                     item.get("structured_data", {}).get("recommendation")
                     == "needs_revision"
@@ -983,8 +1593,9 @@ def _execute_generation_review(
                     shared_context["evaluation_findings"] = review_output["findings"]
                     shared_context["workflow_approval"] = "not_ready"
                     last_result = {
-                        "status": "completed",
+                        "status": "failed",
                         "test_cases": generated_cases,
+                        "generation_stats": generation_stats,
                         "validation": validation_output,
                         "review": review_output,
                     }
@@ -1006,8 +1617,13 @@ def _execute_generation_review(
                         review_output,
                     )
                     last_result = {
-                        "status": "completed",
+                        "status": (
+                            "partial"
+                            if generation_result.status == "partial"
+                            else "completed"
+                        ),
                         "test_cases": generated_cases,
+                        "generation_stats": generation_stats,
                         "validation": validation_output,
                         "review": review_output,
                     }
@@ -1055,8 +1671,13 @@ def _execute_generation_review(
                 validation_task.status = "completed"
                 validation_task.completed_at = datetime.utcnow()
             last_result = {
-                "status": "completed",
+                "status": (
+                    "partial"
+                    if generation_result.status == "partial"
+                    else "completed"
+                ),
                 "test_cases": generated_cases,
+                "generation_stats": generation_stats,
                 "validation": validation_output,
                 "review": review_output,
             }
@@ -1141,7 +1762,14 @@ def _execute_generation_review(
                     if downstream_attempt is None:
                         downstream_attempt = _start_attempt(db, downstream_task)
                     if downstream_attempt.status == "running":
+                        existing_review_output = (
+                            review_task.output_data
+                            if failed_stage == "review"
+                            and isinstance(review_task.output_data, dict)
+                            else {}
+                        )
                         stage_output = {
+                            **existing_review_output,
                             "status": "failed",
                             "errors": [error],
                         }
@@ -1161,8 +1789,17 @@ def _execute_generation_review(
                     else []
                 )
                 last_result = {
-                    "status": "completed",
+                    "status": (
+                        "failed"
+                        if failed_stage in {"generation", "validation"}
+                        else "completed"
+                    ),
                     "test_cases": generated_cases,
+                    "generation_stats": (
+                        structured.get("generation_stats", {})
+                        if isinstance(structured, dict)
+                        else {}
+                    ),
                     "validation": (
                         validation_task.output_data
                         if validation_task is not None
@@ -1209,13 +1846,17 @@ def _execute_generation_review(
 
 def _agent_inputs(workflow: WorkflowRun, task_type: str) -> dict[str, Any]:
     if task_type == "requirements_analysis":
-        return {
+        inputs = {
             "query": (
                 workflow.input_data.get("requirements_prompt")
                 or workflow.input_data.get("request")
                 or "Project requirements, specifications, user stories, and acceptance criteria"
             )
         }
+        document_ids = workflow.input_data.get("document_ids")
+        if isinstance(document_ids, list) and document_ids:
+            inputs["document_ids"] = document_ids
+        return inputs
     if task_type == "change_risk_analysis":
         return {
             "change_summary": workflow.input_data["change_summary"],
@@ -1410,6 +2051,8 @@ def _execute_parallel_batch(
 
     for task, attempt, _context in prepared:
         result = result_by_task_id[task.id]
+        if task.task_type == "requirements_analysis":
+            _persist_extracted_requirements(db, workflow.project_id, result)
         output = _store_result(db, task, attempt, result)
         task_results[task.task_type] = output
         _update_context_from_output(task.task_type, output, shared_context)
@@ -1652,28 +2295,7 @@ def _execute_workflow(db: Session, workflow: WorkflowRun) -> None:
             )
             task_results["aggregation"] = aggregation.output_data or {}
 
-    statuses = [task.status for task in tasks if task.task_type != "aggregation"]
-    failures = sum(
-        task.status == "failed"
-        or (
-            task.status == "skipped"
-            and isinstance(task.error_details, dict)
-            and task.error_details.get("code") == "DEPENDENCY_NOT_SATISFIED"
-        )
-        for task in tasks
-        if task.task_type != "aggregation"
-    )
-    partial_outputs = any(
-        output.get("status") == "partial"
-        for output in task_results.values()
-        if isinstance(output, dict)
-    ) or any(status == "partial" for status in statuses)
-    if failures and failures == len(statuses):
-        workflow.status = "failed"
-    elif failures or partial_outputs:
-        workflow.status = "partially_completed"
-    else:
-        workflow.status = "completed"
+    workflow.status, failures = _workflow_completion_status(tasks, task_results)
     workflow.final_output = {
         "workflow_context": shared_context,
         "results": {

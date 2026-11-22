@@ -2,6 +2,7 @@ import logging
 import time
 from dataclasses import replace
 from datetime import datetime, timezone
+from typing import Any
 
 from app.llm.contracts import (
     LLMError,
@@ -21,7 +22,12 @@ logger = logging.getLogger(__name__)
 _FALLBACK_CATEGORIES = {
     LLMErrorCategory.RATE_LIMIT,
     LLMErrorCategory.TIMEOUT,
+    LLMErrorCategory.EMPTY_RESPONSE,
+    LLMErrorCategory.INVALID_RESPONSE,
 }
+_MAX_RETRIES_PER_PROVIDER = 1
+_BASE_RETRY_DELAY_SECONDS = 0.25
+_MAX_RETRY_DELAY_SECONDS = 30.0
 
 
 class LLMRouter:
@@ -178,6 +184,100 @@ class LLMRouter:
             and response.error_details.details.get("transient") is True
         )
 
+    @classmethod
+    def _retry_delay(
+        cls,
+        response: LLMResponse,
+        retry_number: int,
+    ) -> float:
+        error = response.error_details
+        retry_after = (
+            error.details.get("retry_after_seconds")
+            if error is not None
+            else None
+        )
+        if (
+            isinstance(retry_after, (int, float))
+            and not isinstance(retry_after, bool)
+            and retry_after >= 0
+        ):
+            return min(float(retry_after), _MAX_RETRY_DELAY_SECONDS)
+        return min(
+            _BASE_RETRY_DELAY_SECONDS * (2 ** (retry_number - 1)),
+            _MAX_RETRY_DELAY_SECONDS,
+        )
+
+    @classmethod
+    def _attempt_provider(
+        cls,
+        provider: LLMProvider,
+        request: LLMGenerationRequest,
+        *,
+        first_attempt_number: int,
+        is_fallback_attempt: bool,
+    ) -> tuple[LLMResponse, list[LLMCallTelemetry], list[dict[str, Any]]]:
+        attempts: list[LLMCallTelemetry] = []
+        retry_diagnostics: list[dict[str, Any]] = []
+        response: LLMResponse | None = None
+
+        for retry_number in range(_MAX_RETRIES_PER_PROVIDER + 1):
+            response, telemetry = cls._timed_call(
+                provider,
+                request,
+                attempt_number=first_attempt_number + retry_number,
+                is_fallback_attempt=is_fallback_attempt,
+            )
+            attempts.append(telemetry)
+            if (
+                response.success
+                or not cls._is_fallback_eligible(response)
+                or retry_number >= _MAX_RETRIES_PER_PROVIDER
+            ):
+                break
+
+            delay = cls._retry_delay(response, retry_number + 1)
+            error = response.error_details
+            reason = (
+                error.category.value
+                if error is not None
+                else LLMErrorCategory.PROVIDER_API.value
+            )
+            retry_diagnostics.append(
+                {
+                    "provider": provider.provider_name,
+                    "attempt_number": first_attempt_number + retry_number,
+                    "reason": reason,
+                    "delay_seconds": delay,
+                    "fallback_attempt": is_fallback_attempt,
+                }
+            )
+            logger.warning(
+                "Retrying LLM provider request: provider=%s model=%s "
+                "attempt=%s reason=%s delay_seconds=%s",
+                provider.provider_name,
+                request.model,
+                retry_number + 1,
+                reason,
+                delay,
+            )
+            time.sleep(delay)
+
+        if response is None:
+            raise RuntimeError("Provider attempt loop did not execute")
+        return response, attempts, retry_diagnostics
+
+    @staticmethod
+    def _failure_diagnostics(response: LLMResponse) -> dict[str, str]:
+        error = response.error_details
+        diagnostics = {
+            "stage": response.stage,
+            "error_type": response.error_type or "",
+        }
+        if error is not None:
+            diagnostics["error_category"] = error.category.value
+            diagnostics["error_type"] = error.error_type or diagnostics["error_type"]
+        return diagnostics
+
     @staticmethod
     def _invalid_request(
         request: LLMGenerationRequest,
@@ -212,19 +312,34 @@ class LLMRouter:
                 "Request provider/model does not match the selected primary.",
             )
 
-        primary_response, primary_attempt = self._timed_call(
+        primary_response, primary_attempts, retry_diagnostics = self._attempt_provider(
             self.primary_provider,
             request,
-            attempt_number=1,
+            first_attempt_number=1,
             is_fallback_attempt=False,
         )
+        fallback_eligible = self._is_fallback_eligible(primary_response)
         if (
             primary_response.success
             or self.fallback_provider is None
-            or not self._is_fallback_eligible(primary_response)
+            or not fallback_eligible
         ):
+            primary_response = replace(
+                primary_response,
+                metadata={
+                    **primary_response.metadata,
+                    "fallback_configured": self.fallback_provider is not None,
+                    "fallback_attempted": False,
+                    "fallback_eligible": fallback_eligible,
+                    "provider_attempt_count": len(primary_attempts),
+                    "retry_count": len(retry_diagnostics),
+                    "primary_retry_count": len(retry_diagnostics),
+                    "fallback_retry_count": 0,
+                    "retry_diagnostics": retry_diagnostics,
+                },
+            )
             self._record_telemetry(
-                [primary_attempt],
+                primary_attempts,
                 primary_response,
                 fallback_attempted=False,
                 fallback_succeeded=False,
@@ -241,15 +356,42 @@ class LLMRouter:
             self.primary_provider.provider_name,
             self.fallback_provider.provider_name,
         )
-        fallback_response, fallback_attempt = self._timed_call(
+        fallback_response, fallback_attempts, fallback_retries = self._attempt_provider(
             self.fallback_provider,
             fallback_request,
-            attempt_number=2,
+            first_attempt_number=len(primary_attempts) + 1,
             is_fallback_attempt=True,
         )
+        retry_diagnostics.extend(fallback_retries)
+        primary_diagnostics = self._failure_diagnostics(primary_response)
+        fallback_diagnostics = self._failure_diagnostics(fallback_response)
+        all_attempts = [*primary_attempts, *fallback_attempts]
+        fallback_metadata = {
+            **fallback_response.metadata,
+            "fallback_configured": True,
+            "fallback_attempted": True,
+            "fallback_succeeded": fallback_response.success,
+            "provider_attempt_count": len(all_attempts),
+            "retry_count": len(retry_diagnostics),
+            "primary_retry_count": len(primary_attempts) - 1,
+            "fallback_retry_count": len(fallback_attempts) - 1,
+            "retry_diagnostics": retry_diagnostics,
+            "primary_provider": self.primary_provider.provider_name,
+            "primary_model": self.primary_provider.model_name,
+            "primary_failure_stage": primary_diagnostics["stage"],
+            "primary_error_category": primary_diagnostics.get("error_category", ""),
+            "primary_error_type": primary_diagnostics["error_type"],
+            "fallback_reason": primary_diagnostics.get("error_category", ""),
+            "fallback_provider": self.fallback_provider.provider_name,
+            "fallback_model": self.fallback_provider.model_name,
+        }
         if fallback_response.success:
+            fallback_response = replace(
+                fallback_response,
+                metadata=fallback_metadata,
+            )
             self._record_telemetry(
-                [primary_attempt, fallback_attempt],
+                all_attempts,
                 fallback_response,
                 fallback_attempted=True,
                 fallback_succeeded=True,
@@ -274,10 +416,13 @@ class LLMRouter:
                     primary_error.category.value if primary_error is not None else None
                 ),
                 "fallback_provider": self.fallback_provider.provider_name,
+                "fallback_model": self.fallback_provider.model_name,
                 "fallback_failure_stage": fallback_response.stage,
                 "fallback_error_category": (
                     fallback_error.category.value if fallback_error is not None else None
                 ),
+                "primary_error_type": primary_diagnostics["error_type"],
+                "fallback_error_type": fallback_diagnostics["error_type"],
             },
         )
         response = LLMResponse(
@@ -293,13 +438,34 @@ class LLMRouter:
             request_id=request.request_id,
             metadata={
                 **request.metadata,
+                "fallback_configured": True,
+                "fallback_attempted": True,
+                "fallback_succeeded": False,
+                "provider_attempt_count": len(all_attempts),
+                "retry_count": len(retry_diagnostics),
+                "primary_retry_count": len(primary_attempts) - 1,
+                "fallback_retry_count": len(fallback_attempts) - 1,
+                "retry_diagnostics": retry_diagnostics,
+                "primary_provider": self.primary_provider.provider_name,
+                "primary_model": self.primary_provider.model_name,
+                "primary_failure_stage": primary_diagnostics["stage"],
+                "primary_error_category": primary_diagnostics.get(
+                    "error_category", ""
+                ),
+                "primary_error_type": primary_diagnostics["error_type"],
                 "fallback_provider": self.fallback_provider.provider_name,
+                "fallback_model": self.fallback_provider.model_name,
                 "fallback_failure_stage": fallback_response.stage,
+                "fallback_error_category": fallback_diagnostics.get(
+                    "error_category", ""
+                ),
+                "fallback_error_type": fallback_diagnostics["error_type"],
+                "fallback_reason": primary_diagnostics.get("error_category", ""),
             },
             error_details=combined_error,
         )
         self._record_telemetry(
-            [primary_attempt, fallback_attempt],
+            all_attempts,
             response,
             fallback_attempted=True,
             fallback_succeeded=False,

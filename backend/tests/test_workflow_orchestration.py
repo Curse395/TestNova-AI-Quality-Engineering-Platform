@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from fastapi import BackgroundTasks
@@ -43,7 +43,13 @@ from app.models.test_case_requirement import TestCaseRequirement
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.services import workflow_service
-from app.services.workflow_service import WorkflowService
+from app.services.workflow_service import (
+    WorkflowService,
+    _generation_requirement_definitions,
+    _persist_extracted_requirements,
+    _requirements_prompt,
+)
+from app.services.analytics_service import AnalyticsService
 from app.services.workflow_validation_service import WorkflowValidationService
 from app.services.test_case_evaluation_service import (
     TestCaseEvaluationService as EvaluationService,
@@ -118,6 +124,55 @@ def test_typed_workflow_contracts_validate_required_identity():
     assert context.evidence_references == []
     with pytest.raises(ValidationError):
         AgentInput(workflow_id=1, task_type="requirements_analysis")
+
+
+def test_workflow_hands_explicit_evidence_linked_requirements_to_generation():
+    workflow = WorkflowRun(
+        project_id=3,
+        initiated_by=4,
+        workflow_type="full_qa_workflow",
+        status="running",
+        input_data={},
+    )
+    shared_context = {
+        "requirements": {
+            "requirements": [
+                {
+                    "id": "REQ-002",
+                    "classification": "explicit",
+                    "description": "Users can sign in and access protected pages.",
+                    "evidence_chunk_ids": [12, 13],
+                },
+                {
+                    "id": None,
+                    "classification": "inferred",
+                    "description": "Authentication may require additional hardening.",
+                    "evidence_chunk_ids": [12],
+                },
+            ],
+            "acceptance_criteria": [],
+            "non_functional_requirements": [
+                {
+                    "description": "The patient page should load in under two seconds.",
+                    "evidence_chunk_ids": [14],
+                }
+            ],
+        }
+    }
+
+    definitions = _generation_requirement_definitions(workflow, shared_context)
+    prompt = _requirements_prompt(workflow, shared_context)
+
+    assert definitions == [
+        {
+            "requirement_key": "REQ-002",
+            "description": "Users can sign in and access protected pages.",
+            "evidence_chunk_ids": [12, 13],
+        }
+    ]
+    assert "REQ-002" in prompt
+    assert "Non-functional requirement" in prompt
+    assert "under two seconds" in prompt
 
 
 def test_orchestrator_classifies_supported_workflows_and_dependencies():
@@ -1047,7 +1102,11 @@ def test_requirements_agent_retains_only_supported_chunk_references():
 
     assert result.status == "success"
     assert result.data["requirements"][0]["evidence_chunk_ids"] == [21]
-    assert result.evidence == evidence
+    assert len(result.evidence) == 1
+    assert result.evidence[0]["chunk_id"] == evidence[0]["chunk_id"]
+    assert result.evidence[0]["document_id"] == evidence[0]["document_id"]
+    assert result.evidence[0]["content"] == evidence[0]["content"]
+    assert result.evidence[0]["document_name"] == evidence[0]["document_name"]
 
 
 def test_bug_analysis_skips_without_reports_or_failed_executions():
@@ -1076,7 +1135,7 @@ def test_bug_analysis_skips_without_reports_or_failed_executions():
             "success",
         ),
         ("REQ-1 fails for test case 31.", "confirmed", "REQ-1", "success"),
-        ("REQ-1 fails for test case 31.", "unsupported", "REQ-9", "failed"),
+        ("REQ-1 fails for test case 31.", "unsupported", "REQ-9", "partial"),
     ],
 )
 def test_bug_relationship_confirmation_requires_direct_evidence(
@@ -1153,9 +1212,15 @@ def test_bug_relationship_confirmation_requires_direct_evidence(
     )
 
     assert result.status == result_status
-    if result_status == "failed":
-        assert result.error["code"] == "BUG_ANALYSIS_OUTPUT_INVALID"
-        assert result.evidence == reports
+    if expected_status == "unsupported":
+        assert result.data["related_requirements"] == []
+        assert any(
+            "unsupported requirement relationship" in warning
+            for warning in result.data["warnings"]
+        )
+        assert result.data["related_test_cases"][0][
+            "relationship_status"
+        ] == "confirmed"
         return
     assert result.data["related_requirements"][0]["relationship_status"] == expected_status
     assert result.data["related_test_cases"][0]["relationship_status"] == "confirmed"
@@ -1253,7 +1318,6 @@ def test_bug_analysis_accepts_supported_bug_records_and_exact_prompt_schema():
     assert [item["chunk_id"] for item in result.data["evidence"]] == [46, 47, 48]
     prompt = prompts["system_prompt"]
     for field in (
-        "bugs",
         "observed_behavior",
         "expected_behavior",
         "related_requirements",
@@ -1261,6 +1325,9 @@ def test_bug_analysis_accepts_supported_bug_records_and_exact_prompt_schema():
         "inferred_relationships",
     ):
         assert f'"{field}": [entry, ...]' in prompt
+    assert '"bugs": [bug_entry, ...]' in prompt
+    assert "Each bug_entry must contain bug_id, title, description, severity" in prompt
+    assert "each distinct source-reported bug" in prompt
     assert '"evidence_chunk_ids": an array of integer chunk IDs' in prompt
     assert '"relationship_status" as exactly "confirmed" or "inferred"' in prompt
 
@@ -1425,6 +1492,39 @@ def test_review_agent_keeps_low_severity_evidence_note_non_blocking():
     assert result.data["actionable_regeneration_feedback"] == []
 
 
+@pytest.mark.parametrize(
+    ("exception", "expected_retryable"),
+    [
+        (
+            OperationalError("SELECT 1", {}, Exception("connection reset")),
+            True,
+        ),
+        (ValueError("Test case not found in this project"), False),
+    ],
+)
+def test_review_agent_marks_only_transient_execution_errors_retryable(
+    exception,
+    expected_retryable,
+):
+    def fail_evaluation(**_kwargs):
+        raise exception
+
+    agent = ReviewAgent.__new__(ReviewAgent)
+    agent.service = SimpleNamespace(evaluate=fail_evaluation)
+
+    result = agent.run(
+        AgentContext(
+            user_id=4,
+            project_id=3,
+            task="review",
+            inputs={"test_case_id": 9},
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.error["retryable"] is expected_retryable
+
+
 def test_deterministic_validation_rejects_bad_project_evidence_and_duplicates(db):
     session, user, project = db
     document = Document(
@@ -1544,6 +1644,283 @@ def test_validation_failure_limits_generation_to_two_regenerations(db, monkeypat
     assert workflow.status == "partially_completed"
 
 
+def test_empty_generation_fails_and_validation_rejects_empty_list(db, monkeypatch):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="test_generation",
+        status="running",
+        input_data={"requirements_prompt": "Generate evidence-backed cases."},
+    )
+    session.add(workflow)
+    session.commit()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    generation_calls = []
+    validation_calls = []
+
+    class FakeOrchestrator:
+        def route(self, context: AgentContext) -> AgentResult:
+            if context.task == "requirements_analysis":
+                return AgentResult("requirements_analysis_agent", "success", data={})
+            if context.task == "test_generation":
+                generation_calls.append(context.inputs["workflow_attempt_number"])
+                return AgentResult(
+                    "test_generation_agent",
+                    "failed",
+                    data={
+                        "generated_count": 0,
+                        "test_cases": [],
+                        "generation_stats": {
+                            "generation_status": "failed",
+                            "diagnostic": "The model returned an empty JSON array.",
+                        },
+                    },
+                    error={
+                        "code": "NO_USABLE_TEST_CASES",
+                        "message": "The model returned an empty JSON array.",
+                    },
+                )
+            raise AssertionError(f"Unexpected task: {context.task}")
+
+    monkeypatch.setattr(
+        workflow_service,
+        "_register_agents",
+        lambda _db: FakeOrchestrator(),
+    )
+
+    def validate(*_args, **kwargs):
+        validation_calls.append(kwargs["test_case_ids"])
+        return {
+            "valid": False,
+            "findings": [
+                {
+                    "severity": "high",
+                    "check": "generated_cases",
+                    "message": "No generated test cases were supplied.",
+                }
+            ],
+            "validated_case_ids": [],
+        }
+
+    monkeypatch.setattr(WorkflowValidationService, "validate", validate)
+
+    workflow_service._execute_workflow(session, workflow)
+
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    assert generation_calls == [1, 2, 3]
+    assert generation.status == "failed"
+    assert generation.attempt_count == 3
+    assert generation.output_data["status"] == "failed"
+    assert validation_calls == [[]]
+    assert validation.status == "failed"
+    assert validation.output_data["valid"] is False
+    assert review.status == "skipped"
+    assert review.error_details["code"] == "DEPENDENCY_NOT_SATISFIED"
+    assert workflow.status == "partially_completed"
+    generation_output = workflow.final_output["results"]["test_generation"]
+    assert generation_output["status"] == "failed"
+    assert generation_output["generation_stats"]["generation_status"] == "failed"
+    assert generation_output["errors"][0]["code"] == "NO_USABLE_TEST_CASES"
+
+
+def test_later_empty_generation_reuses_persisted_success_and_does_not_block_review(
+    db,
+    monkeypatch,
+):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="full_qa_workflow",
+        status="running",
+        input_data={"requirements_prompt": "Generate three supported cases.", "max_cases": 3},
+    )
+    session.add(workflow)
+    session.commit()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    generated_case_ids = [701, 702, 703]
+    generation_calls = []
+    validation_calls = []
+    review_calls = []
+
+    class FakeOrchestrator:
+        def route(self, context):
+            if context.task == "requirements_analysis":
+                return AgentResult("requirements_analysis_agent", "success", data={})
+            if context.task == "test_generation":
+                generation_number = context.inputs["workflow_attempt_number"]
+                generation_calls.append(generation_number)
+                if generation_number > 1:
+                    return AgentResult(
+                        "test_generation_agent",
+                        "failed",
+                        data={
+                            "generation_stats": {
+                                "generation_status": "failed",
+                                "generated_count": 0,
+                                "final_persisted_count": 0,
+                                "diagnostic": "The model returned an empty JSON array.",
+                            }
+                        },
+                        error={
+                            "code": "NO_USABLE_TEST_CASES",
+                            "message": "The model returned an empty JSON array.",
+                        },
+                    )
+
+                generation_run = GenerationRunModel(
+                    project_id=project.id,
+                    created_by_user_id=user.id,
+                    requirements_prompt="Generate three supported cases.",
+                    requested_categories=["positive"],
+                    max_cases=3,
+                    status="completed",
+                    generated_case_count=3,
+                    final_persisted_count=3,
+                    workflow_run_id=workflow.id,
+                    workflow_attempt_number=1,
+                )
+                session.add(generation_run)
+                session.flush()
+                test_cases = []
+                for case_id in generated_case_ids:
+                    case = CaseModel(
+                        id=case_id,
+                        project_id=project.id,
+                        created_by_user_id=user.id,
+                        title=f"Persisted generated case {case_id}",
+                        description="A supported case persisted on attempt one.",
+                        test_type="functional",
+                        category="positive",
+                        priority="medium",
+                        severity="medium",
+                        preconditions="The fixture is ready.",
+                        steps=[{"action": "Run", "expected_result": "Pass"}],
+                        expected_result="Pass",
+                        review_status="draft",
+                        generation_run_id=generation_run.id,
+                    )
+                    session.add(case)
+                    test_cases.append(
+                        {
+                            "id": case_id,
+                            "title": case.title,
+                            "review_status": "draft",
+                        }
+                    )
+                session.commit()
+                return AgentResult(
+                    "test_generation_agent",
+                    "success",
+                    data={
+                        "generated_count": 3,
+                        "final_persisted_count": 3,
+                        "test_cases": test_cases,
+                        "generation_stats": {
+                            "generation_status": "completed",
+                            "requested_max_cases": 3,
+                            "generated_count": 3,
+                            "final_persisted_count": 3,
+                        },
+                    },
+                )
+            if context.task == "review":
+                case_id = context.inputs["test_case_id"]
+                review_calls.append(case_id)
+                return AgentResult(
+                    "review_agent",
+                    "success",
+                    data={
+                        "test_case_id": case_id,
+                        "recommendation": "needs_revision",
+                        "findings": [],
+                        "actionable_regeneration_feedback": [
+                            "Add one distinct supported scenario."
+                        ],
+                    },
+                )
+            raise AssertionError(f"Unexpected task: {context.task}")
+
+    monkeypatch.setattr(
+        workflow_service,
+        "_register_agents",
+        lambda _db: FakeOrchestrator(),
+    )
+    monkeypatch.setattr(workflow_service, "sleep", lambda _seconds: None)
+
+    def validate(*_args, **kwargs):
+        validation_calls.append(kwargs["test_case_ids"])
+        return {
+            "valid": True,
+            "findings": [],
+            "validated_case_ids": kwargs["test_case_ids"],
+        }
+
+    monkeypatch.setattr(WorkflowValidationService, "validate", validate)
+
+    workflow_service._execute_workflow(session, workflow)
+
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    assert generation_calls == [1, 2, 3]
+    assert validation_calls == [generated_case_ids]
+    assert review_calls == generated_case_ids
+    assert generation.status == "completed"
+    assert generation.output_data["structured_data"]["test_cases"] == [
+        {"id": case_id, "title": f"Persisted generated case {case_id}", "review_status": "draft"}
+        for case_id in generated_case_ids
+    ]
+    assert [attempt.status for attempt in generation.attempts] == [
+        "completed", "retrying", "failed"
+    ]
+    assert [case.id for case in session.query(CaseModel).filter_by(project_id=project.id).order_by(CaseModel.id).all()] == generated_case_ids
+    assert validation.status == "completed"
+    assert validation.output_data["validated_case_ids"] == generated_case_ids
+    assert review.status == "completed"
+    assert review.status != "skipped"
+    assert workflow.status == "completed"
+    assert workflow.final_output["results"]["test_generation"]["test_cases"] == generation.output_data[
+        "structured_data"
+    ]["test_cases"]
+
+    workflow_service._execute_workflow(session, workflow)
+
+    assert generation_calls == [1, 2, 3]
+    assert session.query(CaseModel).filter_by(project_id=project.id).count() == 3
+
+
+def test_workflow_validation_rejects_empty_case_list(db):
+    session, user, project = db
+
+    result = WorkflowValidationService(session).validate(
+        user.id,
+        project.id,
+        [],
+    )
+
+    assert result["valid"] is False
+    assert result["validated_case_ids"] == []
+    assert result["findings"] == [
+        {
+            "severity": "high",
+            "check": "generated_cases",
+            "message": "No generated test cases were supplied.",
+        }
+    ]
+
+
 def test_review_exception_preserves_generation_and_validation_success(db, monkeypatch):
     session, user, project = db
     workflow = WorkflowRun(
@@ -1615,6 +1992,203 @@ def test_review_exception_preserves_generation_and_validation_success(db, monkey
     assert workflow.status == "partially_completed"
     assert workflow.final_output["results"]["test_generation"]["status"] == "completed"
     assert workflow.error_summary == "1 workflow task(s) failed or were blocked."
+
+
+def _run_review_retry_workflow(
+    db,
+    monkeypatch,
+    review_responses,
+    test_case_ids=(601,),
+):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="test_generation",
+        status="running",
+        input_data={"requirements_prompt": "Generate supported tests."},
+    )
+    session.add(workflow)
+    session.commit()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    review_calls = []
+
+    class FakeOrchestrator:
+        def route(self, context):
+            if context.task == "requirements_analysis":
+                return AgentResult("requirements_analysis_agent", "success", data={})
+            if context.task == "test_generation":
+                return AgentResult(
+                    "test_generation_agent",
+                    "success",
+                    data={
+                        "generated_count": 1,
+                    "test_cases": [
+                        {"id": case_id, "title": f"Saved supported case {case_id}"}
+                        for case_id in test_case_ids
+                    ],
+                    },
+                )
+            if context.task == "review":
+                review_calls.append(context.inputs["test_case_id"])
+                response_index = min(len(review_calls) - 1, len(review_responses) - 1)
+                response = review_responses[response_index]
+                if isinstance(response, Exception):
+                    raise response
+                return response
+            raise AssertionError(f"Unexpected task: {context.task}")
+
+    monkeypatch.setattr(workflow_service, "_register_agents", lambda _db: FakeOrchestrator())
+    monkeypatch.setattr(workflow_service, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        WorkflowValidationService,
+        "validate",
+        lambda *_args, **kwargs: {
+            "valid": True,
+            "findings": [],
+            "validated_case_ids": kwargs["test_case_ids"],
+        },
+    )
+    workflow_service._execute_workflow(session, workflow)
+    return workflow, tasks, review_calls
+
+
+def _transient_review_failure():
+    return AgentResult(
+        "review_agent",
+        "failed",
+        error={
+            "code": "REVIEW_FAILED",
+            "message": "Database connection interrupted.",
+            "error_type": "OperationalError",
+            "retryable": True,
+        },
+    )
+
+
+def _successful_review_result():
+    return AgentResult(
+        "review_agent",
+        "success",
+        data={
+            "test_case_id": 601,
+            "recommendation": "human_review_required",
+            "findings": [],
+        },
+    )
+
+
+def test_transient_review_failure_retries_once_then_completes_workflow(db, monkeypatch):
+    workflow, tasks, review_calls = _run_review_retry_workflow(
+        db,
+        monkeypatch,
+        [_transient_review_failure(), _successful_review_result()],
+    )
+
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    assert review_calls == [601, 601]
+    assert generation.status == validation.status == review.status == "completed"
+    assert workflow.status == "completed"
+    assert [attempt.status for attempt in review.attempts] == [
+        "retrying",
+        "completed",
+    ]
+    assert review.attempts[0].error_details["retryable"] is True
+    assert review.output_data["reviews"][0]["structured_data"]["test_case_id"] == 601
+
+
+def test_review_retry_does_not_repeat_successful_case_reviews(db, monkeypatch):
+    first_success = _successful_review_result()
+    transient_failure = AgentResult(
+        "review_agent",
+        "failed",
+        error={
+            "code": "REVIEW_FAILED",
+            "message": "Temporary connection failure.",
+            "retryable": True,
+        },
+    )
+    second_success = AgentResult(
+        "review_agent",
+        "success",
+        data={"test_case_id": 602, "recommendation": "human_review_required"},
+    )
+    workflow, tasks, review_calls = _run_review_retry_workflow(
+        db,
+        monkeypatch,
+        [first_success, transient_failure, second_success],
+        test_case_ids=(601, 602),
+    )
+
+    review = _task_by_type_for_test(tasks, "review")
+    assert review_calls == [601, 602, 602]
+    assert review.status == "completed"
+    assert workflow.status == "completed"
+    assert [item["structured_data"]["test_case_id"] for item in review.output_data[
+        "reviews"
+    ]] == [601, 602]
+
+
+def test_permanent_review_failure_is_not_retried(db, monkeypatch):
+    permanent_failure = AgentResult(
+        "review_agent",
+        "failed",
+        error={
+            "code": "REVIEW_TARGET_NOT_FOUND",
+            "message": "Test case not found in this project.",
+            "retryable": False,
+        },
+    )
+    workflow, tasks, review_calls = _run_review_retry_workflow(
+        db,
+        monkeypatch,
+        [permanent_failure],
+    )
+
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    assert review_calls == [601]
+    assert generation.status == validation.status == "completed"
+    assert review.status == "failed"
+    assert workflow.status == "partially_completed"
+    assert len(review.attempts) == 1
+    assert review.attempts[0].error_details["retryable"] is False
+    assert workflow.final_output["results"]["test_generation"]["test_cases"][0][
+        "id"
+    ] == 601
+
+
+def test_transient_review_failures_stop_at_retry_limit_and_preserve_results(
+    db,
+    monkeypatch,
+):
+    workflow, tasks, review_calls = _run_review_retry_workflow(
+        db,
+        monkeypatch,
+        [_transient_review_failure()],
+    )
+
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    assert review_calls == [601, 601]
+    assert generation.status == validation.status == "completed"
+    assert generation.output_data["structured_data"]["test_cases"][0]["id"] == 601
+    assert validation.output_data["validated_case_ids"] == [601]
+    assert review.status == "failed"
+    assert workflow.status == "partially_completed"
+    assert [attempt.status for attempt in review.attempts] == ["retrying", "failed"]
+    assert review.attempts[-1].error_details["retryable"] is True
+    assert workflow.final_output["results"]["test_generation"]["test_cases"][0][
+        "id"
+    ] == 601
 
 
 def test_reviewer_feedback_survives_regeneration_retry_exhaustion(db, monkeypatch):
@@ -1991,6 +2565,116 @@ def test_workflow_api_scopes_path_project_and_persists_start(db, monkeypatch):
     assert saved.initiated_by == user.id
 
 
+@pytest.mark.parametrize(
+    "change_summary",
+    [None, "           "],
+    ids=["missing", "whitespace-only"],
+)
+def test_change_risk_workflow_rejects_empty_summary_without_persisting_records(
+    db,
+    monkeypatch,
+    change_summary,
+):
+    session, user, project = db
+
+    def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    scheduled = []
+    monkeypatch.setattr(
+        "app.api.workflows.execute_workflow_background",
+        lambda workflow_id: scheduled.append(workflow_id),
+    )
+    payload = {"workflow_type": "change_risk_analysis"}
+    if change_summary is not None:
+        payload["change_summary"] = change_summary
+    try:
+        response = TestClient(app).post(
+            f"/projects/{project.id}/workflows",
+            json=payload,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+    assert response.json()["message"] == (
+        "Change summary is required for Change Risk Analysis."
+    )
+    assert session.query(WorkflowRun).count() == 0
+    assert session.query(WorkflowTask).count() == 0
+    assert session.query(WorkflowTaskAttempt).count() == 0
+    assert scheduled == []
+
+
+def test_change_risk_workflow_accepts_valid_summary(db, monkeypatch):
+    session, user, project = db
+
+    def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    scheduled = []
+    monkeypatch.setattr(
+        "app.api.workflows.execute_workflow_background",
+        lambda workflow_id: scheduled.append(workflow_id),
+    )
+    try:
+        response = TestClient(app).post(
+            f"/projects/{project.id}/workflows",
+            json={
+                "workflow_type": "change_risk_analysis",
+                "change_summary": "Update payment authorization timeout handling.",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 202
+    workflow = session.query(WorkflowRun).one()
+    assert workflow.workflow_type == "change_risk_analysis"
+    assert workflow.input_data["change_summary"] == (
+        "Update payment authorization timeout handling."
+    )
+    assert session.query(WorkflowTask).count() > 0
+    assert session.query(WorkflowTaskAttempt).count() == 0
+    assert scheduled == [workflow.id]
+
+
+def test_other_workflow_types_do_not_require_change_summary(db, monkeypatch):
+    session, user, project = db
+
+    def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    scheduled = []
+    monkeypatch.setattr(
+        "app.api.workflows.execute_workflow_background",
+        lambda workflow_id: scheduled.append(workflow_id),
+    )
+    try:
+        response = TestClient(app).post(
+            f"/projects/{project.id}/workflows",
+            json={
+                "workflow_type": "test_generation",
+                "requirements_prompt": "Check the documented sign-in flow.",
+                "request": "Also consider change risk in the sign-in flow.",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 202
+    workflow = session.query(WorkflowRun).one()
+    assert workflow.workflow_type == "test_generation"
+    assert "change_summary" not in workflow.input_data
+    assert scheduled == [workflow.id]
+
+
 def test_workflow_details_return_ordered_attempts_and_generated_case_evidence(db):
     session, user, project = db
     now = datetime.utcnow()
@@ -2083,15 +2767,18 @@ def test_workflow_details_return_ordered_attempts_and_generated_case_evidence(db
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db] = override_db
     try:
-        response = TestClient(app).get(
-            f"/projects/{project.id}/workflows/{workflow.id}"
-        )
+        client = TestClient(app)
+        history = client.get(f"/projects/{project.id}/workflows")
+        response = client.get(f"/projects/{project.id}/workflows/{workflow.id}")
     finally:
         app.dependency_overrides.clear()
 
+    assert history.status_code == 200
+    assert history.json()["data"][0]["status"] == "partially_completed"
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["status"] == "partially_completed"
+    assert history.json()["data"][0]["status"] == data["status"]
     assert data["created_at"] and data["started_at"]
     assert data["completed_at"] and data["updated_at"]
     assert [task["id"] for task in data["tasks"]] == sorted(
@@ -2131,6 +2818,40 @@ def test_workflow_creation_rolls_back_run_when_task_creation_fails(db, monkeypat
 
     assert response.status_code == 500
     assert session.query(WorkflowRun).filter_by(project_id=project.id).count() == 0
+
+
+def test_workflow_start_rate_limit_remains_enforced_with_isolated_test_state(
+    db,
+    monkeypatch,
+):
+    session, user, project = db
+
+    def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    monkeypatch.setattr(BackgroundTasks, "add_task", lambda *_args, **_kwargs: None)
+    try:
+        client = TestClient(app)
+        responses = [
+            client.post(
+                f"/projects/{project.id}/workflows",
+                json={"workflow_type": "test_generation"},
+            )
+            for _ in range(6)
+        ]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert [response.status_code for response in responses] == [
+        202,
+        409,
+        409,
+        409,
+        409,
+        429,
+    ]
 
 
 def test_workflow_scheduling_failure_is_persisted_as_resumable(db, monkeypatch):
@@ -2541,6 +3262,240 @@ def test_resume_after_reviewer_rejection_generates_new_cases_with_feedback(
     assert workflow.final_output["results"]["test_generation"]["test_cases"][0]["id"] == 202
 
 
+def _persisted_review_result(case_id, status="completed"):
+    result = {
+        "agent_name": "review_agent",
+        "status": status,
+        "structured_data": {
+            "test_case_id": case_id,
+            "recommendation": "human_review_required",
+            "findings": [],
+        },
+        "errors": [],
+    }
+    if status == "failed":
+        result["errors"] = [
+            {
+                "code": "REVIEW_FAILED",
+                "message": "Transient review failure.",
+                "retryable": True,
+            }
+        ]
+    return result
+
+
+def _create_review_recovery_workflow(db, case_ids, review_attempt_outputs):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="test_generation",
+        status="partially_completed",
+        input_data={"requirements_prompt": "Generate supported tests."},
+        generation_attempt_count=1,
+        final_output={"workflow_context": {}, "results": {}},
+    )
+    session.add(workflow)
+    session.flush()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    requirements = _task_by_type_for_test(tasks, "requirements_analysis")
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    review = _task_by_type_for_test(tasks, "review")
+    aggregation = _task_by_type_for_test(tasks, "aggregation")
+    requirements.status = "completed"
+    requirements.attempt_count = 1
+    requirements.output_data = {"status": "completed", "structured_data": {}}
+    test_cases = [
+        {"id": case_id, "title": f"Persisted candidate {case_id}"}
+        for case_id in case_ids
+    ]
+    generation_output = {
+        "agent_name": "test_generation_agent",
+        "status": "completed",
+        "structured_data": {"test_cases": test_cases, "generated_count": len(test_cases)},
+        "evidence_references": [],
+        "execution_metadata": {"generation_attempt_number": 1},
+    }
+    generation.status = "completed"
+    generation.attempt_count = 1
+    generation.output_data = generation_output
+    validation_output = {
+        "status": "completed",
+        "valid": True,
+        "findings": [],
+        "validated_case_ids": case_ids,
+    }
+    validation.status = "completed"
+    validation.attempt_count = 1
+    validation.output_data = validation_output
+    saved_reviews = review_attempt_outputs[-1][1]["reviews"]
+    review_output = {
+        "status": "failed",
+        "review_status": "failed",
+        "workflow_approval": "not_ready",
+        "reviews": saved_reviews,
+    }
+    review.status = "failed"
+    review.attempt_count = len(review_attempt_outputs)
+    review.output_data = review_output
+    review.error_details = {
+        "code": "REVIEW_FAILED",
+        "message": "Review stage did not complete.",
+        "retryable": True,
+    }
+    aggregation.status = "completed"
+    aggregation.output_data = {"status": "completed", "results": {}}
+    session.add_all(
+        [
+            WorkflowTaskAttempt(
+                workflow_task_id=requirements.id,
+                attempt_number=1,
+                status="completed",
+                output_data=requirements.output_data,
+                started_at=datetime.utcnow(),
+            ),
+            WorkflowTaskAttempt(
+                workflow_task_id=generation.id,
+                attempt_number=1,
+                status="completed",
+                output_data=generation_output,
+                started_at=datetime.utcnow(),
+            ),
+            WorkflowTaskAttempt(
+                workflow_task_id=validation.id,
+                attempt_number=1,
+                status="completed",
+                output_data=validation_output,
+                started_at=datetime.utcnow(),
+            ),
+        ]
+    )
+    for attempt_number, (status, output) in enumerate(review_attempt_outputs, start=1):
+        session.add(
+            WorkflowTaskAttempt(
+                workflow_task_id=review.id,
+                attempt_number=attempt_number,
+                status=status,
+                output_data=output,
+                error_details=review.error_details if status == "failed" else None,
+                started_at=datetime.utcnow(),
+                completed_at=datetime.utcnow(),
+            )
+        )
+    session.commit()
+    return workflow, tasks
+
+
+def test_resume_retries_only_failed_review_after_retry_exhaustion(db, monkeypatch):
+    first_attempt_reviews = [
+        _persisted_review_result(701),
+        _persisted_review_result(702, status="failed"),
+    ]
+    workflow, tasks = _create_review_recovery_workflow(
+        db,
+        [701, 702],
+        [
+            ("retrying", {"status": "retrying", "reviews": first_attempt_reviews}),
+            ("failed", {"status": "failed", "reviews": first_attempt_reviews}),
+        ],
+    )
+    calls = []
+
+    class FakeOrchestrator:
+        def route(self, context):
+            assert context.task == "review"
+            calls.append(context.inputs["test_case_id"])
+            return AgentResult(
+                "review_agent",
+                "success",
+                data={
+                    "test_case_id": context.inputs["test_case_id"],
+                    "recommendation": "human_review_required",
+                    "findings": [],
+                },
+            )
+
+    monkeypatch.setattr(workflow_service, "_register_agents", lambda _db: FakeOrchestrator())
+    monkeypatch.setattr(
+        WorkflowValidationService,
+        "validate",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Completed validation must not be rerun.")
+        ),
+    )
+
+    workflow_service._execute_workflow(db[0], workflow)
+    review = _task_by_type_for_test(tasks, "review")
+    generation = _task_by_type_for_test(tasks, "test_generation")
+    validation = _task_by_type_for_test(tasks, "deterministic_validation")
+    assert calls == [702]
+    assert generation.attempt_count == validation.attempt_count == 1
+    assert review.status == workflow.status == "completed"
+    assert [attempt.status for attempt in review.attempts] == [
+        "retrying",
+        "failed",
+        "completed",
+    ]
+    saved_case_ids = [
+        item["structured_data"]["test_case_id"]
+        for item in review.output_data["reviews"]
+    ]
+    assert saved_case_ids == [701, 702]
+    workflow_service._execute_workflow(db[0], workflow)
+    assert calls == [702]
+    assert len(review.output_data["reviews"]) == len(set(saved_case_ids))
+
+
+def test_resume_executes_missing_review_results_without_repeating_saved_ones(
+    db,
+    monkeypatch,
+):
+    saved_reviews = [_persisted_review_result(711)]
+    workflow, tasks = _create_review_recovery_workflow(
+        db,
+        [711, 712, 713],
+        [("failed", {"status": "failed", "reviews": saved_reviews})],
+    )
+    calls = []
+
+    class FakeOrchestrator:
+        def route(self, context):
+            assert context.task == "review"
+            case_id = context.inputs["test_case_id"]
+            calls.append(case_id)
+            return AgentResult(
+                "review_agent",
+                "success",
+                data={"test_case_id": case_id, "recommendation": "human_review_required"},
+            )
+
+    monkeypatch.setattr(workflow_service, "_register_agents", lambda _db: FakeOrchestrator())
+    monkeypatch.setattr(
+        WorkflowValidationService,
+        "validate",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Completed validation must not be rerun.")
+        ),
+    )
+
+    workflow_service._execute_workflow(db[0], workflow)
+
+    review = _task_by_type_for_test(tasks, "review")
+    assert calls == [712, 713]
+    assert workflow.status == review.status == "completed"
+    saved_case_ids = [
+        item["structured_data"]["test_case_id"]
+        for item in review.output_data["reviews"]
+    ]
+    assert saved_case_ids == [711, 712, 713]
+    assert len(saved_case_ids) == len(set(saved_case_ids))
+
+
 def test_resume_runs_unfinished_review_without_regenerating_or_revalidating(
     db,
     monkeypatch,
@@ -2740,6 +3695,101 @@ def test_stale_workflow_is_marked_interrupted_for_safe_resume(db):
     assert workflow.status == "partially_completed"
     assert tasks[0].status == "failed"
     assert tasks[0].error_details["message"]
+
+
+def test_terminal_tasks_reconcile_workflow_after_final_status_commit_is_missed(
+    db,
+):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="test_generation",
+        status="running",
+        input_data={},
+    )
+    session.add(workflow)
+    session.flush()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    for task in tasks:
+        task.status = "completed"
+        task.output_data = {"status": "completed", "task_type": task.task_type}
+    generation_output = {
+        "status": "completed",
+        "test_cases": [{"id": 42, "title": "Evidence-linked case"}],
+    }
+    generation = next(task for task in tasks if task.task_type == "test_generation")
+    generation.output_data = generation_output
+    aggregation = next(task for task in tasks if task.task_type == "aggregation")
+    aggregation.output_data = {
+        "status": "completed",
+        "results": {"test_generation": generation_output},
+        "workflow_context": {"workflow_approval": "ready_for_human_review"},
+        "workflow_approval": "ready_for_human_review",
+    }
+    session.commit()
+
+    def override_db():
+        yield session
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = override_db
+    try:
+        response = TestClient(app).get(
+            f"/projects/{project.id}/workflows/{workflow.id}"
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["status"] == "completed"
+    assert data["completed_at"]
+    assert data["final_output"]["results"]["test_generation"] == generation_output
+    assert (
+        data["final_output"]["workflow_approval"]
+        == "ready_for_human_review"
+    )
+    assert workflow.status == "completed"
+
+
+def test_terminal_task_reconciliation_preserves_partial_workflow_status(db):
+    session, user, project = db
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="test_generation",
+        status="running",
+        input_data={},
+    )
+    session.add(workflow)
+    session.flush()
+    tasks = WorkflowService.create_tasks(
+        session,
+        workflow,
+        Orchestrator.workflow_template("test_generation"),
+    )
+    for task in tasks:
+        task.status = "completed"
+        task.output_data = {"status": "completed"}
+    requirements = next(
+        task for task in tasks if task.task_type == "requirements_analysis"
+    )
+    requirements.status = "partial"
+    requirements.output_data = {"status": "partial", "requirements": []}
+    session.commit()
+
+    assert WorkflowService.reconcile_terminal(workflow)
+    assert workflow.status == "partially_completed"
+    assert workflow.completed_at is not None
+    assert workflow.final_output["results"]["requirements_analysis"] == {
+        "status": "partial",
+        "requirements": [],
+    }
 
 
 def test_stale_pending_workflow_is_explicitly_failed_and_recoverable(db):
@@ -3025,6 +4075,246 @@ def test_attempt_and_generation_idempotency_keys_are_unique_and_validated(db):
     with pytest.raises(IntegrityError):
         session.commit()
     session.rollback()
+
+
+def test_validated_requirements_persist_independently_and_analytics_uses_catalog(db):
+    session, user, project = db
+    document = Document(
+        filename="requirements.pdf",
+        content_type="application/pdf",
+        storage_path="requirements.pdf",
+        project_id=project.id,
+        source_type="requirements",
+        processing_status="completed",
+    )
+    session.add(document)
+    session.flush()
+    chunks = []
+    for index in range(12):
+        chunk = DocumentChunk(
+            document_id=document.id,
+            chunk_index=index,
+            content=f"REQ-{index + 1:03}: Requirement {index + 1} is supported.",
+        )
+        session.add(chunk)
+        chunks.append(chunk)
+    session.flush()
+    requirements = [
+        {
+            "id": f"REQ-{index + 1:03}",
+            "description": f"Requirement {index + 1} is supported.",
+            "classification": "explicit",
+            "evidence_chunk_ids": [chunks[index].id],
+        }
+        for index in range(12)
+    ]
+    evidence = [
+        {"chunk_id": chunk.id, "content": chunk.content}
+        for chunk in chunks
+    ]
+    analysis_result = AgentResult(
+        "requirements_analysis_agent",
+        "success",
+        data={
+            "requirements": requirements,
+            "non_functional_requirements": [
+                {"description": "Pages load quickly.", "evidence_chunk_ids": [chunks[0].id]}
+            ],
+        },
+        evidence=evidence,
+    )
+
+    assert _persist_extracted_requirements(session, project.id, analysis_result) == 12
+    session.commit()
+    assert _persist_extracted_requirements(session, project.id, analysis_result) == 12
+    session.commit()
+    rows = (
+        session.query(ProjectRequirement)
+        .filter(ProjectRequirement.project_id == project.id)
+        .order_by(ProjectRequirement.requirement_key.asc())
+        .all()
+    )
+    assert len(rows) == 12
+    assert {row.requirement_key for row in rows} == {
+        f"REQ-{index:03}" for index in range(1, 13)
+    }
+    assert all(row.classification == "explicit" for row in rows)
+    assert all(row.evidence_chunk_ids for row in rows)
+
+    analytics = AnalyticsService(session).get_requirement_traceability(
+        project.id, user.id
+    )
+    assert analytics["explicit_requirement_count"] == 12
+    assert analytics["inferred_requirement_count"] == 0
+    assert analytics["unlinked_explicit_requirement_count"] == 12
+    assert analytics["explicit_requirements_with_any_case_link"] == 0
+    assert analytics["explicit_requirements_with_approved_case_link"] == 0
+    assert analytics["any_case_link_rate"] == 0
+    assert analytics["approved_case_link_rate"] == 0
+
+    case = CaseModel(
+        project_id=project.id,
+        created_by_user_id=user.id,
+        title="Requirement one check",
+        description="Check requirement one.",
+        test_type="functional",
+        category="positive",
+        priority="high",
+        severity="high",
+        steps=[{"action": "Run", "expected_result": "Pass"}],
+        expected_result="Pass",
+        review_status="approved",
+    )
+    session.add(case)
+    session.flush()
+    session.add(
+        TestCaseRequirement(test_case_id=case.id, requirement_id=rows[0].id)
+    )
+    session.commit()
+    linked = AnalyticsService(session).get_requirement_traceability(project.id, user.id)
+    assert linked["explicit_requirement_count"] == 12
+    assert linked["explicit_requirements_with_any_case_link"] == 1
+    assert linked["explicit_requirements_with_approved_case_link"] == 1
+    assert linked["unlinked_explicit_requirement_count"] == 11
+    assert linked["any_case_link_rate"] == pytest.approx(8.33)
+    assert linked["approved_case_link_rate"] == pytest.approx(8.33)
+
+
+def test_requirement_catalog_is_saved_by_analysis_task_before_generation(db, monkeypatch):
+    session, user, project = db
+    document = Document(
+        filename="requirements.txt",
+        content_type="text/plain",
+        storage_path="requirements.txt",
+        project_id=project.id,
+        source_type="requirements",
+        processing_status="completed",
+    )
+    session.add(document)
+    session.flush()
+    chunk = DocumentChunk(
+        document_id=document.id,
+        chunk_index=0,
+        content="FR-01: Appointment bookings must reject conflicting times.",
+    )
+    session.add(chunk)
+    session.flush()
+    workflow = WorkflowRun(
+        project_id=project.id,
+        initiated_by=user.id,
+        workflow_type="full_qa_workflow",
+        status="running",
+        input_data={},
+    )
+    session.add(workflow)
+    session.flush()
+    task = WorkflowTask(
+        workflow_run_id=workflow.id,
+        agent_name="requirements_analysis_agent",
+        task_type="requirements_analysis",
+        status="pending",
+    )
+    session.add(task)
+    session.commit()
+    result = AgentResult(
+        "requirements_analysis_agent",
+        "success",
+        data={
+            "requirements": [
+                {
+                    "id": "FR-01",
+                    "description": "Appointment bookings must reject conflicting times.",
+                    "classification": "explicit",
+                    "evidence_chunk_ids": [chunk.id],
+                }
+            ]
+        },
+        evidence=[{"chunk_id": chunk.id, "content": chunk.content}],
+    )
+    monkeypatch.setattr(workflow_service, "_run_isolated_agent", lambda *_args: result)
+    task_results = {}
+
+    workflow_service._execute_parallel_batch(
+        session,
+        workflow,
+        [task],
+        {},
+        task_results,
+        lambda: None,
+    )
+
+    assert task.status == "completed"
+    assert session.query(ProjectRequirement).filter_by(
+        project_id=project.id, requirement_key="FR-01"
+    ).count() == 1
+    assert task_results["requirements_analysis"]["status"] == "completed"
+
+
+def test_requirement_catalog_rejects_invalid_ids_and_unowned_evidence(db):
+    session, _user, project = db
+    result = AgentResult(
+        "requirements_analysis_agent",
+        "success",
+        data={
+            "requirements": [
+                {
+                    "id": "REQ-NOT-NUMBERED",
+                    "description": "Invalid numbered ID.",
+                    "classification": "explicit",
+                    "evidence_chunk_ids": [999],
+                }
+            ]
+        },
+        evidence=[{"chunk_id": 999, "content": "REQ-NOT-NUMBERED: Invalid."}],
+    )
+
+    assert _persist_extracted_requirements(session, project.id, result) == 0
+    assert session.query(ProjectRequirement).filter_by(project_id=project.id).count() == 0
+
+
+def test_exhaustive_requirement_chunk_query_is_project_and_source_scoped(db):
+    from app.services.retrieval_service import RetrievalService
+
+    session, user, project = db
+    other_project = Project(
+        name="Other project", organitzation_id=project.organitzation_id
+    )
+    session.add(other_project)
+    session.flush()
+    for target_project, source_type, content in (
+        (project, "requirements", "REQ-001: Selected requirement."),
+        (project, "document", "Unselected supporting document."),
+        (other_project, "requirements", "REQ-999: Other project's requirement."),
+    ):
+        document = Document(
+            filename=f"{source_type}.txt",
+            content_type="text/plain",
+            storage_path=f"{target_project.id}/{source_type}.txt",
+            project_id=target_project.id,
+            source_type=source_type,
+            processing_status="completed",
+        )
+        session.add(document)
+        session.flush()
+        session.add(
+            DocumentChunk(document_id=document.id, chunk_index=0, content=content)
+        )
+    session.commit()
+
+    chunks = RetrievalService(session).get_project_source_chunks(
+        current_user_id=user.id,
+        project_id=project.id,
+        source_type="requirements",
+    )
+
+    assert len(chunks) == 1
+    assert chunks[0]["content"] == "REQ-001: Selected requirement."
+    with pytest.raises(ValueError, match="Project not found"):
+        RetrievalService(session).get_project_source_chunks(
+            current_user_id=user.id + 1000,
+            project_id=project.id,
+            source_type="requirements",
+        )
 
 
 def _task_by_type_for_test(tasks, task_type):

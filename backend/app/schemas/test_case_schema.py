@@ -102,7 +102,7 @@ class TestCaseStep(BaseModel):
 class GeneratedTestCase(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
-    test_type: str | None = Field(default=None, max_length=60)
+    test_type: str = Field(default="functional", max_length=60, validate_default=True)
     category: TestCategory
     priority: TestPriority
     severity: TestSeverity = "medium"

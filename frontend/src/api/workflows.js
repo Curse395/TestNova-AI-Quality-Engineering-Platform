@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient } from './client.js'
 
 export async function fetchWorkflows(projectId) {
   const { data } = await apiClient.get(`/projects/${projectId}/workflows`)
