@@ -31,6 +31,88 @@ class RetrievalService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def get_project_source_chunks(
+        self,
+        current_user_id: int,
+        project_id: int,
+        source_type: str,
+        document_ids: list[int] | None = None,
+    ) -> list[dict[str, object]]:
+        """Return every processed chunk from one explicitly selected source type.
+
+        This is intended for exhaustive extraction from a user's selected source
+        class (for example requirements documents), not broad project retrieval.
+        Project ownership is checked before any document content is returned.
+        """
+        project = get_owned_project(self.db, project_id, current_user_id)
+        if project is None:
+            raise ValueError("Project not found")
+        normalized = source_type.strip().lower()
+        if normalized not in SUPPORTED_SOURCE_TYPES:
+            raise UnsupportedSourceTypeError("The source type is unsupported")
+
+        selected_document_ids = None
+        if document_ids:
+            if any(
+                not isinstance(document_id, int)
+                or isinstance(document_id, bool)
+                or document_id <= 0
+                for document_id in document_ids
+            ):
+                raise ValueError("Selected document IDs must be positive integers")
+            selected_document_ids = {
+                row[0]
+                for row in self.db.query(Document.id)
+                .filter(
+                    Document.project_id == project_id,
+                    Document.id.in_(document_ids),
+                )
+                .all()
+            }
+            if selected_document_ids != set(document_ids):
+                raise ValueError(
+                    "One or more selected documents do not belong to this project"
+                )
+
+        rows = (
+            self.db.query(DocumentChunk, Document)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .filter(
+                Document.project_id == project.id,
+                Document.source_type == normalized,
+                Document.processing_status == "completed",
+            )
+            .filter(
+                Document.id.in_(selected_document_ids)
+                if selected_document_ids is not None
+                else True
+            )
+            .order_by(Document.id.asc(), DocumentChunk.chunk_index.asc())
+            .all()
+        )
+        return [
+            {
+                "chunk_id": chunk.id,
+                "document_id": document.id,
+                "document_name": document.filename,
+                "source_type": document.source_type or "document",
+                "content_type": document.content_type,
+                "uploaded_at": (
+                    document.uploaded_at.isoformat()
+                    if isinstance(document.uploaded_at, datetime)
+                    else document.uploaded_at
+                ),
+                "uploaded_by_user_id": document.uploaded_by_user_id,
+                "processing_status": document.processing_status,
+                "source_metadata": chunk.source_metadata or {},
+                "content": chunk.content,
+                "score": None,
+                "similarity": None,
+                "distance": None,
+            }
+            for chunk, document in rows
+        ]
+
     def search_project_context(
         self,
         current_user_id: int,

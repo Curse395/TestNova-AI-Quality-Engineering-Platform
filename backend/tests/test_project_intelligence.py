@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import ValidationError
 
+from app.api import analytics as analytics_api
 from app.models.organization import Organization
 from app.models.project import Project
 from app.models.workflow_run import WorkflowRun
@@ -56,9 +57,11 @@ class _FakeLLM:
 class _AuthorizationQuery:
     def __init__(self, project):
         self.project = project
+        self.joins = []
         self.filters = []
 
-    def join(self, _model):
+    def join(self, model, onclause=None):
+        self.joins.append((model, onclause))
         return self
 
     def filter(self, *_conditions):
@@ -414,6 +417,111 @@ def test_quality_summary_prompt_preserves_empty_metrics_and_excludes_readiness_c
     assert result["status"] == "available"
     assert '"total_cases": 0' in llm.arguments[0]["user_prompt"]
     assert "release-readiness verdict" in llm.arguments[0]["system_prompt"]
+    prompt = llm.arguments[0]["system_prompt"]
+    assert "must each be JSON arrays of SummaryStatement objects" in prompt
+    assert "return an empty array []" in prompt
+    assert "never omit a required field" in prompt
+
+
+def test_quality_summary_accepts_empty_and_populated_array_sections_with_valid_evidence():
+    payload = _summary_payload()
+    payload["testing_activity"] = [{
+        "statement": "Three saved test cases were observed.",
+        "evidence_ids": ["test_case_statistics"],
+        "interpretation": False,
+    }]
+    llm = _FakeLLM({"success": True, "answer": json.dumps(payload)})
+    service = ProjectIntelligenceService(
+        db=None,
+        llm_service=llm,
+        summary_cache=EvidenceFingerprintCache(),
+    )
+    service.require_owned_project = lambda *_args: None
+    service._summary_evidence = lambda *_args: (
+        {"test_case_statistics": {"total_cases": 3}},
+        [{"id": "test_case_statistics", "description": "Persisted case counts."}],
+    )
+
+    result = service.generate_quality_summary(8, 2)
+
+    assert result["status"] == "available"
+    assert result["summary"]["testing_activity"] == payload["testing_activity"]
+    assert result["summary"]["execution_trends"] == []
+    QualitySummaryResponse.model_validate(result)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "testing_activity",
+        "test_case_quality",
+        "requirement_traceability",
+        "execution_trends",
+        "significant_failures",
+        "identified_risks",
+        "missing_evidence",
+        "recommended_actions",
+        "limitations",
+    ],
+)
+def test_quality_summary_rejects_non_array_section_values(field_name, caplog):
+    payload = _summary_payload()
+    payload[field_name] = {
+        "statement": "This malformed object must not be coerced into a list.",
+        "evidence_ids": ["test_case_statistics"],
+        "interpretation": False,
+    }
+    service = ProjectIntelligenceService(
+        db=None,
+        llm_service=_FakeLLM({"success": True, "answer": json.dumps(payload)}),
+        summary_cache=EvidenceFingerprintCache(),
+    )
+    service.require_owned_project = lambda *_args: None
+    service._summary_evidence = lambda *_args: (
+        {"test_case_statistics": {"total_cases": 0}},
+        [{"id": "test_case_statistics", "description": "Persisted case counts."}],
+    )
+
+    with caplog.at_level("WARNING", logger="app.services.project_intelligence_service"):
+        result = service.generate_quality_summary(8, 2)
+
+    assert result["status"] == "unavailable"
+    assert result["_failure_category"] == "structured_output_invalid"
+    assert f"validation_fields={field_name}" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "testing_activity",
+        "test_case_quality",
+        "requirement_traceability",
+        "execution_trends",
+        "significant_failures",
+        "identified_risks",
+        "missing_evidence",
+        "recommended_actions",
+        "limitations",
+    ],
+)
+def test_quality_summary_does_not_fill_missing_required_array_sections(field_name):
+    payload = _summary_payload()
+    del payload[field_name]
+    service = ProjectIntelligenceService(
+        db=None,
+        llm_service=_FakeLLM({"success": True, "answer": json.dumps(payload)}),
+        summary_cache=EvidenceFingerprintCache(),
+    )
+    service.require_owned_project = lambda *_args: None
+    service._summary_evidence = lambda *_args: (
+        {"test_case_statistics": {"total_cases": 0}},
+        [{"id": "test_case_statistics", "description": "Persisted case counts."}],
+    )
+
+    result = service.generate_quality_summary(8, 2)
+
+    assert result["status"] == "unavailable"
+    assert result["_failure_category"] == "structured_output_invalid"
 
 
 def test_generated_summary_redacts_sensitive_values_before_returning():
@@ -505,14 +613,62 @@ def test_quality_summary_uses_existing_central_llm_fallback(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "response",
+    "response,expected_category,expected_log_fields,secret_text",
     [
-        {"success": False, "error": "provider details must not escape"},
-        {"success": True, "answer": "{not-json"},
-        {"success": True, "answer": json.dumps(_summary_payload("unknown_source"))},
+        (
+            {
+                "success": False,
+                "error": "provider details must not escape",
+                "provider": "gemini",
+                "model": "configured-model",
+                "stage": "provider_request",
+                "error_category": "provider_api",
+                "error_type": "APIError",
+                "fallback_attempted": True,
+            },
+            "llm_response_failed",
+            ("diagnostic=llm_response", "project_id=8", "failure_category=llm_response_failed", "response_state=unsuccessful_response", "error_category=provider_api"),
+            "provider details must not escape",
+        ),
+        (
+            {"success": True, "answer": ""},
+            "llm_response_failed",
+            ("diagnostic=llm_response", "project_id=8", "failure_category=llm_response_failed", "response_state=empty_answer"),
+            "",
+        ),
+        (
+            {"success": True, "answer": "{not-json"},
+            "structured_output_invalid",
+            ("diagnostic=structured_output_validation", "project_id=8", "failure_category=structured_output_invalid", "error_category=structured_output_parse", "error_stage=structured_output_parse"),
+            "{not-json",
+        ),
+        (
+            {
+                "success": True,
+                "answer": json.dumps({
+                    **_summary_payload(),
+                    "private project document": "sensitive project text",
+                }),
+            },
+            "structured_output_invalid",
+            ("diagnostic=structured_output_validation", "project_id=8", "failure_category=structured_output_invalid", "validation_error_count=1", "validation_fields=other", "validation_codes=extra_forbidden"),
+            "sensitive project text",
+        ),
+        (
+            {"success": True, "answer": json.dumps(_summary_payload("private project reference"))},
+            "evidence_reference_invalid",
+            ("diagnostic=evidence_reference_validation", "project_id=8", "failure_category=evidence_reference_invalid", "error_type=ValueError", "invalid_reference_count=1", "allowed_evidence_count=1"),
+            "private project reference",
+        ),
     ],
 )
-def test_quality_summary_handles_provider_parse_and_unapproved_reference_errors(response):
+def test_quality_summary_logs_safe_unavailable_branch_diagnostics(
+    response,
+    expected_category,
+    expected_log_fields,
+    secret_text,
+    caplog,
+):
     service = ProjectIntelligenceService(
         db=None,
         llm_service=_FakeLLM(response),
@@ -524,11 +680,72 @@ def test_quality_summary_handles_provider_parse_and_unapproved_reference_errors(
         [{"id": "test_case_statistics", "description": "Persisted case counts."}],
     )
 
-    result = service.generate_quality_summary(8, 2)
+    with caplog.at_level("WARNING", logger="app.services.project_intelligence_service"):
+        result = service.generate_quality_summary(8, 2)
 
     assert result["status"] == "unavailable"
     assert result["summary"] is None
-    assert "provider details" not in str(result)
+    assert result["error"] == "Quality summary is temporarily unavailable."
+    assert result["_failure_category"] == expected_category
+    for field in expected_log_fields:
+        assert field in caplog.text
+    if secret_text:
+        assert secret_text not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "failure_category,expected_log_category",
+    [
+        ("evidence_reference_invalid", "evidence_reference_invalid"),
+        ("sensitive document contents", "unclassified"),
+    ],
+)
+def test_quality_summary_api_logs_status_and_safe_category_then_removes_internal_marker(
+    monkeypatch,
+    caplog,
+    failure_category,
+    expected_log_category,
+):
+    class _StubProjectIntelligenceService:
+        def __init__(self, _db):
+            pass
+
+        def generate_quality_summary(self, *, project_id, current_user_id):
+            assert project_id == 2
+            assert current_user_id == 7
+            return {
+                "project_id": project_id,
+                "status": "unavailable",
+                "summary": None,
+                "evidence_sources": [],
+                "generated_at": None,
+                "cached": False,
+                "evidence_fingerprint": "safe-fingerprint",
+                "limitations": [],
+                "error": "Quality summary is temporarily unavailable.",
+                "_failure_category": failure_category,
+            }
+
+    monkeypatch.setattr(
+        analytics_api,
+        "ProjectIntelligenceService",
+        _StubProjectIntelligenceService,
+    )
+
+    with caplog.at_level("WARNING", logger="app.api.analytics"):
+        result = analytics_api.generate_quality_summary(
+            project_id=2,
+            current_user=SimpleNamespace(id=7),
+            db=object(),
+        )
+
+    assert result["status"] == "unavailable"
+    assert "_failure_category" not in result
+    QualitySummaryResponse.model_validate(result)
+    assert "Quality summary API result: project_id=2 status=unavailable" in caplog.text
+    assert f"failure_category={expected_log_category}" in caplog.text
+    if expected_log_category == "unclassified":
+        assert failure_category not in caplog.text
 
 
 def test_summary_evidence_fingerprint_is_stable_and_changes_with_metrics():
@@ -573,5 +790,8 @@ def test_project_ownership_query_uses_existing_organization_owner_relation():
     ProjectIntelligenceService(db=db).require_owned_project(9, 3)
 
     assert db.queried_model is Project
-    assert db.query_result.join(Organization) is db.query_result
+    assert len(db.query_result.joins) == 1
+    joined_model, onclause = db.query_result.joins[0]
+    assert joined_model is Organization
+    assert onclause.compare(Project.organitzation_id == Organization.id)
     assert len(db.query_result.filters) == 2

@@ -9,6 +9,16 @@ class KnowledgeAgent(BaseAgent):
     def __init__(self, db):
         self.service = RetrievalService(db)
 
+    def get_project_source_chunks(
+        self, current_user_id, project_id, source_type, document_ids=None
+    ):
+        return self.service.get_project_source_chunks(
+            current_user_id=current_user_id,
+            project_id=project_id,
+            source_type=source_type,
+            document_ids=document_ids,
+        )
+
     def run(self, context: AgentContext) -> AgentResult:
         query = context.inputs.get("query")
         limit = context.inputs.get("limit", 4)
