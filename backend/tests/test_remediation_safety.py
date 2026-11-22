@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api import uploads
+from app.core import file_storage
 from app.api import test_cases
 from app.core.security import ALGORITHM, create_access_token
 from app.core.config import settings
@@ -51,6 +52,11 @@ def create_project(client: TestClient, email: str) -> tuple[str, int]:
     return token, project_response.json()["data"]["id"]
 
 
+def _set_upload_root(monkeypatch, root):
+    monkeypatch.setattr(uploads, "UPLOAD_ROOT", root)
+    monkeypatch.setattr(file_storage, "UPLOAD_ROOT", root)
+
+
 def test_jwt_uses_configured_secret():
     token = create_access_token({"user_id": 123})
     from jose import jwt
@@ -71,7 +77,7 @@ def test_upload_rejects_unsupported_and_mismatched_formats():
 
 def test_upload_uses_safe_name_and_server_generated_path(client, monkeypatch, tmp_path):
     token, project_id = create_project(client, "upload-safety@example.com")
-    monkeypatch.setattr(uploads, "UPLOAD_ROOT", tmp_path)
+    _set_upload_root(monkeypatch, tmp_path)
 
     response = client.post(
         f"/uploads/?project_id={project_id}",
@@ -94,7 +100,7 @@ def test_upload_uses_safe_name_and_server_generated_path(client, monkeypatch, tm
 
 def test_upload_rejects_empty_file(client, monkeypatch, tmp_path):
     token, project_id = create_project(client, "empty-upload@example.com")
-    monkeypatch.setattr(uploads, "UPLOAD_ROOT", tmp_path)
+    _set_upload_root(monkeypatch, tmp_path)
 
     response = client.post(
         f"/uploads/?project_id={project_id}",
@@ -108,7 +114,7 @@ def test_upload_rejects_empty_file(client, monkeypatch, tmp_path):
 
 def test_upload_enforces_configured_size_limit(client, monkeypatch, tmp_path):
     token, project_id = create_project(client, "large-upload@example.com")
-    monkeypatch.setattr(uploads, "UPLOAD_ROOT", tmp_path)
+    _set_upload_root(monkeypatch, tmp_path)
     monkeypatch.setattr(settings, "MAX_UPLOAD_SIZE_BYTES", 4)
 
     response = client.post(

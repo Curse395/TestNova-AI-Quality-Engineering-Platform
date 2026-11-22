@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 from app.api import uploads as uploads_api
+from app.core import file_storage
 from app.core.security import create_access_token
 from app.database.connection import Base, SessionLocal, engine
 from app.main import app
@@ -26,12 +27,22 @@ from app.models.test_case_generation_run import (
 from app.models.user import User
 
 
+def _set_upload_root(monkeypatch, root):
+    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", root)
+    monkeypatch.setattr(file_storage, "UPLOAD_ROOT", root)
+
+
 @pytest.fixture(autouse=True)
 def reset_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def isolate_upload_storage(tmp_path, monkeypatch):
+    _set_upload_root(monkeypatch, tmp_path / "uploads")
 
 
 def create_project_and_headers(email: str = "owner@example.com") -> tuple[int, dict[str, str]]:
@@ -126,7 +137,7 @@ def test_delete_document_removes_related_records_but_preserves_history_and_other
 ):
     project_id, headers = create_project_and_headers()
     upload_root = tmp_path / "uploads"
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
 
     document_path = upload_root / str(project_id) / "document.txt"
     document_path.parent.mkdir(parents=True)
@@ -238,7 +249,7 @@ def test_delete_document_returns_404_for_another_users_document(monkeypatch, tmp
     project_id, _ = create_project_and_headers("first@example.com")
     _, other_headers = create_project_and_headers("second@example.com")
     upload_root = tmp_path / "uploads"
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
 
     document_path = upload_root / str(project_id) / "private.txt"
     document_path.parent.mkdir(parents=True)
@@ -268,7 +279,7 @@ def test_delete_document_returns_404_when_missing():
 def test_delete_document_handles_missing_physical_file(monkeypatch, tmp_path):
     project_id, headers = create_project_and_headers()
     upload_root = tmp_path / "uploads"
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
     document = create_document(
         project_id,
         upload_root / str(project_id) / "already-missing.txt",
@@ -294,7 +305,7 @@ def test_delete_document_rolls_back_when_database_commit_fails(
 ):
     project_id, headers = create_project_and_headers()
     upload_root = tmp_path / "uploads"
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
     document_path = upload_root / str(project_id) / "rollback.txt"
     document_path.parent.mkdir(parents=True)
     document_path.write_text("must remain", encoding="utf-8")
@@ -340,7 +351,7 @@ def test_delete_document_rejects_storage_path_outside_upload_root(
     upload_root = tmp_path / "uploads"
     outside_path = tmp_path / "outside.txt"
     outside_path.write_text("must never be deleted", encoding="utf-8")
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
     document = create_document(project_id, outside_path)
 
     response = TestClient(app).delete(
@@ -363,7 +374,7 @@ def test_delete_document_reports_physical_cleanup_failure(
 ):
     project_id, headers = create_project_and_headers()
     upload_root = tmp_path / "uploads"
-    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    _set_upload_root(monkeypatch, upload_root)
     document_path = upload_root / str(project_id) / "locked.txt"
     document_path.parent.mkdir(parents=True)
     document_path.write_text("cleanup warning", encoding="utf-8")

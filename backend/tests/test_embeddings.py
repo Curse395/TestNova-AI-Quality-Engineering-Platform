@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
+from app.api import uploads as uploads_api
+from app.core import file_storage
 from app.database.connection import Base, SessionLocal, engine
 from app.main import app
 from app.models.document_chunk import DocumentChunk
@@ -21,6 +23,13 @@ def reset_db():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def isolate_upload_storage(tmp_path, monkeypatch):
+    upload_root = tmp_path / "uploads"
+    monkeypatch.setattr(uploads_api, "UPLOAD_ROOT", upload_root)
+    monkeypatch.setattr(file_storage, "UPLOAD_ROOT", upload_root)
 
 
 def test_embedding_regeneration_flow(monkeypatch):
