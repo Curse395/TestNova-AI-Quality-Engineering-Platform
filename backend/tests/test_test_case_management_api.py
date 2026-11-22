@@ -2,10 +2,14 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.api import test_cases as test_cases_api
+from app.core.dependencies import get_current_user
+from app.database.connection import get_db
 from app.database.connection import Base
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
@@ -23,11 +27,17 @@ from app.schemas.test_case_schema import TestCaseUpdate as CaseUpdate
 from app.services.test_case_evaluation_service import (
     TestCaseEvaluationService as CaseEvaluationService,
 )
+from app.services.analytics_service import AnalyticsService
+from app.main import app
 
 
 @pytest.fixture
 def api_db():
-    engine = create_engine("sqlite://")
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     user = User(
@@ -165,6 +175,7 @@ def test_case_detail_and_generation_history_expose_traceability_and_accounting(a
     assert run["generation_status"] == "partial"
     assert run["requirement_keys"] == ["REQ-AUTH-01"]
     assert run["requirement_keys_covered"] == ["REQ-AUTH-01"]
+    assert run["traced_case_count"] == 1
 
 
 def test_project_test_case_list_returns_evidence_and_requirement_traceability(api_db):
@@ -238,6 +249,99 @@ def test_authorized_update_persists_severity_and_requirements(api_db):
     assert response["data"]["severity"] == "low"
     assert response["data"]["requirement_ids"] == [1]
     assert case.review_status == "draft"
+
+
+def test_approve_test_case_persists_manual_approval_without_evidence(api_db):
+    case = api_db.query(CaseModel).filter_by(id=1).one()
+    case.review_status = "draft"
+    api_db.query(EvidenceModel).filter_by(test_case_id=case.id).delete()
+    api_db.query(TestCaseRequirement).filter_by(test_case_id=case.id).delete()
+    api_db.commit()
+    def override_db():
+        yield api_db
+
+    app.dependency_overrides[get_current_user] = lambda: _owner()
+    app.dependency_overrides[get_db] = override_db
+    try:
+        response = TestClient(app).patch("/projects/1/test-cases/1/approve")
+    finally:
+        app.dependency_overrides.clear()
+
+    api_db.expire_all()
+    persisted = api_db.query(CaseModel).filter_by(id=1).one()
+    assert response.status_code == 200
+    assert response.json()["review_status"] == "approved"
+    assert persisted.review_status == "approved"
+    assert test_cases_api.list_project_test_cases(1, _owner(), api_db)["data"][0][
+        "review_status"
+    ] == "approved"
+
+
+def test_reject_test_case_persists_rejected_status(api_db):
+    case = api_db.query(CaseModel).filter_by(id=1).one()
+    case.review_status = "draft"
+    api_db.commit()
+
+    def override_db():
+        yield api_db
+
+    app.dependency_overrides[get_current_user] = lambda: _owner()
+    app.dependency_overrides[get_db] = override_db
+    try:
+        response = TestClient(app).patch("/projects/1/test-cases/1/reject")
+    finally:
+        app.dependency_overrides.clear()
+
+    api_db.expire_all()
+    persisted = api_db.query(CaseModel).filter_by(id=1).one()
+    assert response.status_code == 200
+    assert response.json()["review_status"] == "rejected"
+    assert persisted.review_status == "rejected"
+    assert test_cases_api.list_project_test_cases(1, _owner(), api_db)["data"][0][
+        "review_status"
+    ] == "rejected"
+
+
+def test_test_case_analytics_counts_persisted_review_statuses(api_db):
+    api_db.add_all([
+        CaseModel(
+            project_id=1,
+            created_by_user_id=1,
+            title="Draft case",
+            description="A test case draft.",
+            category="positive",
+            priority="medium",
+            severity="low",
+            steps=[{"action": "Run", "expected_result": "Pass"}],
+            expected_result="The result is recorded.",
+            review_status="draft",
+        ),
+        CaseModel(
+            project_id=1,
+            created_by_user_id=1,
+            title="Rejected case",
+            description="A rejected test case.",
+            category="negative",
+            priority="low",
+            severity="medium",
+            steps=[{"action": "Run", "expected_result": "Fail"}],
+            expected_result="The result is recorded.",
+            review_status="rejected",
+        ),
+    ])
+    api_db.commit()
+
+    result = AnalyticsService(api_db).get_test_case_statistics(1, 1)
+
+    assert result["total_cases"] == 3
+    assert result["review_status_counts"] == {
+        "draft": 1,
+        "approved": 1,
+        "rejected": 1,
+        "other": 0,
+        "missing": 0,
+        "blank": 0,
+    }
 
 
 def test_update_rejects_requirement_from_another_project(api_db):

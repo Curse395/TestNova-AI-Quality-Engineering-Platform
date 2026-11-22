@@ -1,5 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field,field_validator
 
@@ -28,7 +29,6 @@ from app.models.document_chunk import DocumentChunk
 from app.models.project_requirement import ProjectRequirement
 from app.models.test_case_generation_run import TestCaseGenerationRun
 from app.models.test_case_requirement import TestCaseRequirement
-from app.services.workflow_validation_service import WorkflowValidationService
 
 router = APIRouter(prefix="/projects",tags=["Test Cases"])
 
@@ -443,24 +443,59 @@ def generate_test_cases(project_id:int,request:TestCaseGenerationRequest,current
     context=AgentContext(user_id=current_user.id,project_id=project_id,task="test_generation",inputs={"request":request})
     result=orchestrator.route(context)
 
-    if result.status !="success":
+    if result.status == "failed":
         error = result.error or {}
         code = error.get("code", "GENERATION_FAILED")
         message = error.get("message", "Test-case generation failed.")
+        generation_stats = error.get("generation_stats")
+        if not isinstance(generation_stats, dict):
+            generation_stats = (
+                result.data.get("generation_stats", {})
+                if isinstance(result.data, dict)
+                else {}
+            )
+        if not isinstance(generation_stats, dict):
+            generation_stats = {}
+        failure_payload = {
+            "detail": message,
+            "generation_stats": generation_stats,
+            "generated_count": generation_stats.get("generated_count", 0),
+            "final_persisted_count": generation_stats.get(
+                "final_persisted_count",
+                0,
+            ),
+        }
 
         if code == "PERMISSION_DENIED":
             raise HTTPException(status_code=403, detail=message)
         if code == "INVALID_REQUEST":
             raise HTTPException(status_code=400, detail=message)
         if code == "GENERATION_FAILED":
-            raise HTTPException(status_code=502, detail=message)
+            return JSONResponse(status_code=502, content=failure_payload)
+        if code == "NO_USABLE_TEST_CASES":
+            return JSONResponse(status_code=422, content=failure_payload)
 
         raise HTTPException(status_code=500,detail="Test-case generation failed unexpectedly.")
 
+    if result.status not in {"success", "partial"}:
+        raise HTTPException(
+            status_code=500,
+            detail="Test-case generation returned an invalid status.",
+        )
+
     return {
         "success": True,
-        "message": "Test cases generated successfully.",
+        "status": "partial" if result.status == "partial" else "completed",
+        "message": (
+            "Test cases generated partially."
+            if result.status == "partial"
+            else "Test cases generated successfully."
+        ),
         "generated_count": result.data["generated_count"],
+        "final_persisted_count": result.data.get(
+            "final_persisted_count",
+            len(result.data["test_cases"]),
+        ),
         "generation_stats": result.data.get("generation_stats", {}),
         "test_cases": result.data["test_cases"]
     }
@@ -513,42 +548,6 @@ def approve_test_case(project_id:int,test_case_id:int,current_user:CurrentUser,d
     if not test_case:
         raise HTTPException(status_code=404,detail="Test case not found.")
 
-    validation = WorkflowValidationService(db).validate(
-        user_id=current_user.id,
-        project_id=project_id,
-        test_case_ids=[test_case.id],
-    )
-    if not validation["valid"]:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Test case failed deterministic validation.",
-                "findings": validation["findings"],
-            },
-        )
-
-    review_result = ReviewAgent(db).run(
-        AgentContext(
-            user_id=current_user.id,
-            project_id=project_id,
-            task="review",
-            inputs={"test_case_id": test_case.id},
-        )
-    )
-    if review_result.status == "failed":
-        raise HTTPException(
-            status_code=502,
-            detail="Test case evaluation could not be completed.",
-        )
-    if review_result.data.get("recommendation") == "needs_revision":
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message": "Test case review recommends revision.",
-                "findings": review_result.data.get("findings", []),
-            },
-        )
-
     if test_case.review_status == "approved":
         return {
             "success": True,
@@ -572,6 +571,42 @@ def approve_test_case(project_id:int,test_case_id:int,current_user:CurrentUser,d
         "test_case_id": test_case.id,
         "project_id": project_id,
         "review_status": test_case.review_status
+    }
+
+
+@router.patch("/{project_id}/test-cases/{test_case_id}/reject")
+def reject_test_case(
+    project_id: int,
+    test_case_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
+    project = get_owned_project(db, project_id, current_user.id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found or access denied.")
+
+    test_case = (
+        db.query(TestCase)
+        .filter(TestCase.id == test_case_id, TestCase.project_id == project_id)
+        .first()
+    )
+    if test_case is None:
+        raise HTTPException(status_code=404, detail="Test case not found.")
+
+    test_case.review_status = "rejected"
+    try:
+        db.commit()
+        db.refresh(test_case)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to reject test case.") from None
+
+    return {
+        "success": True,
+        "message": "Test case rejected successfully.",
+        "test_case_id": test_case.id,
+        "project_id": project_id,
+        "review_status": test_case.review_status,
     }
 
 @router.post(

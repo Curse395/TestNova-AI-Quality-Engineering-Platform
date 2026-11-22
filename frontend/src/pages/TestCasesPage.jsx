@@ -4,15 +4,18 @@ import Navbar from '../components/layout/Navbar'
 import Card from '../components/ui/Card'
 import { getApiErrorMessage } from '../api/client'
 import {
+  approveProjectTestCase,
   deleteProjectTestCase,
   evaluateProjectTestCaseGenerationRun,
   fetchProjects,
   fetchProjectTestCase,
   fetchProjectTestCaseGenerationRuns,
   fetchProjectTestCases,
+  rejectProjectTestCase,
   updateProjectTestCase,
 } from '../api/projects'
 import { selectAvailableProjectId } from './workflowPresentation'
+import { reviewStatusLabel } from './testCasePresentation'
 
 const fieldClassName = 'mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100'
 
@@ -79,6 +82,21 @@ function scalarRunDetails(run) {
   return fields
 }
 
+function CollapsibleSection({ title, subtitle, children }) {
+  return (
+    <details className="surface-card rounded-3xl p-5">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <span>
+          <span className="block text-sm font-semibold text-slate-100">{title}</span>
+          <span className="mt-1 block text-sm text-slate-400">{subtitle}</span>
+        </span>
+        <span className="text-xs text-slate-400">Expand / collapse</span>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
+  )
+}
+
 function sourceLocation(metadata = {}) {
   const sourceMetadata = metadata && typeof metadata === 'object' ? metadata : {}
   const location = sourceMetadata.source_location && typeof sourceMetadata.source_location === 'object'
@@ -128,6 +146,7 @@ const TestCasesPage = () => {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [updatingReviewStatus, setUpdatingReviewStatus] = useState(false)
   const [detailError, setDetailError] = useState('')
   const navigate = useNavigate()
 
@@ -250,6 +269,29 @@ const TestCasesPage = () => {
     }
   }
 
+  const updateReviewStatus = async (status) => {
+    if (!selectedCase || updatingReviewStatus) return
+    setUpdatingReviewStatus(true)
+    setDetailError('')
+    try {
+      const result = status === 'approved'
+        ? await approveProjectTestCase(Number(projectId), selectedCase.id)
+        : await rejectProjectTestCase(Number(projectId), selectedCase.id)
+      const updated = { ...selectedCase, review_status: result.review_status }
+      setSelectedCase(updated)
+      setTestCases((current) => current.map((item) => (
+        String(item.id) === String(updated.id)
+          ? { ...item, review_status: updated.review_status }
+          : item
+      )))
+    } catch (requestError) {
+      if (requestError?.response?.status === 401) navigate('/login', { replace: true })
+      else setDetailError(getApiErrorMessage(requestError, 'Test case status could not be updated.'))
+    } finally {
+      setUpdatingReviewStatus(false)
+    }
+  }
+
   const selectedGenerationRun = selectedCase
     ? selectedCase.generation_run
       || generationRuns.find((run) => (
@@ -298,7 +340,7 @@ const TestCasesPage = () => {
           )}
         </Card>
 
-        <Card title="Generation history" subtitle="Review generation limits, retries, saved counts, and quality metrics">
+        <CollapsibleSection title="Generation history" subtitle="Review generation limits, retries, saved counts, and quality metrics">
           {generationRuns.length === 0 ? (
             <p className="text-sm text-slate-400">No generation runs are available for this project.</p>
           ) : (
@@ -354,9 +396,9 @@ const TestCasesPage = () => {
               })}
             </div>
           )}
-        </Card>
+        </CollapsibleSection>
 
-        <Card title="Saved test cases" subtitle="Source links reference the exact document chunks used during generation">
+        <CollapsibleSection title="Saved test cases" subtitle="Open View details to inspect requirements and source evidence">
           {loadingCases ? (
             <p className="text-sm text-slate-400">Loading test cases…</p>
           ) : testCases.length === 0 ? (
@@ -370,19 +412,11 @@ const TestCasesPage = () => {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="font-semibold text-slate-100">{testCase.title}</h2>
-                      {(testCase.test_type || testCase.category || testCase.priority || testCase.severity || testCase.review_status) && (
-                        <p className="mt-1 text-xs capitalize text-slate-400">
-                          {[
-                            testCase.test_type,
-                            testCase.category,
-                            testCase.priority && `${testCase.priority} priority`,
-                            testCase.severity && `${testCase.severity} severity`,
-                            testCase.review_status,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
-                      )}
+                      <p className="mt-1 text-xs text-slate-400">
+                        Priority: {testCase.priority || 'Unavailable'}
+                        {' · '}Severity: {testCase.severity || 'Unavailable'}
+                        {' · '}Status: {reviewStatusLabel(testCase.review_status)}
+                      </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-slate-500">Case #{testCase.id}</span>
@@ -395,73 +429,11 @@ const TestCasesPage = () => {
                       </button>
                     </div>
                   </div>
-                  {testCase.description && (
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-slate-300">{testCase.description}</p>
-                  )}
-                  {testCase.preconditions && (
-                    <div className="mt-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Preconditions</h3>
-                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{testCase.preconditions}</p>
-                    </div>
-                  )}
-                  {Array.isArray(testCase.steps) && testCase.steps.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Test steps</h3>
-                      <ol className="mt-2 list-decimal space-y-3 pl-5">
-                        {testCase.steps.map((step, index) => (
-                          <li key={`${testCase.id}-step-${index}`} className="pl-1 text-sm text-slate-300">
-                            {step.action && <p className="whitespace-pre-wrap">{step.action}</p>}
-                            {step.expected_result && (
-                              <p className="mt-1 whitespace-pre-wrap text-slate-400">
-                                Expected: {step.expected_result}
-                              </p>
-                            )}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                  {testCase.expected_result && (
-                    <div className="mt-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Expected result</h3>
-                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{testCase.expected_result}</p>
-                    </div>
-                  )}
-
-                  {testCase.evidence?.length ? (
-                    <div className="mt-4 border-t border-slate-800 pt-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Source evidence</h3>
-                      <div className="mt-2 space-y-3">
-                        {testCase.evidence.map((source) => {
-                          const location = sourceLocation(source.source_metadata)
-                          return (
-                            <div key={`${source.document_id}-${source.chunk_id}`} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-                              <p className="break-all text-sm font-medium text-sky-200">
-                                {source.document_name}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Document #{source.document_id} · Chunk #{source.chunk_id}
-                                {source.source_type ? ` · ${source.source_type.replaceAll('_', ' ')}` : ''}
-                                {location ? ` · ${location}` : ''}
-                              </p>
-                              <blockquote className="mt-2 whitespace-pre-wrap border-l-2 border-sky-500/40 pl-3 text-sm text-slate-300">
-                                {source.excerpt || 'Source excerpt is unavailable.'}
-                              </blockquote>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-200">
-                      No verified source evidence is available for this test case.
-                    </p>
-                  )}
                 </article>
               ))}
             </div>
           )}
-        </Card>
+        </CollapsibleSection>
 
         {selectedCase && (
           <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/80 p-3 backdrop-blur-sm sm:p-6">
@@ -477,17 +449,38 @@ const TestCasesPage = () => {
                   <h2 id="test-case-detail-title" className="mt-1 text-xl font-semibold text-slate-100">
                     {selectedCase.title}
                   </h2>
+                  <p role="status" className="mt-1 text-xs text-slate-400">
+                    Review status: {reviewStatusLabel(selectedCase.review_status)}
+                  </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {!editing && (
-                    <button
-                      type="button"
-                      disabled={loadingDetail || deleting}
-                      onClick={() => setEditing(true)}
-                      className="rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      Edit
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={loadingDetail || deleting || saving || updatingReviewStatus}
+                        onClick={() => updateReviewStatus('approved')}
+                        className="rounded-xl border border-emerald-500/30 px-3 py-2 text-sm text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50"
+                      >
+                        {updatingReviewStatus ? 'Updating…' : 'Approve'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={loadingDetail || deleting || saving || updatingReviewStatus}
+                        onClick={() => updateReviewStatus('rejected')}
+                        className="rounded-xl border border-rose-500/30 px-3 py-2 text-sm text-rose-200 hover:bg-rose-500/10 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        disabled={loadingDetail || deleting || updatingReviewStatus}
+                        onClick={() => setEditing(true)}
+                        className="rounded-xl border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                    </>
                   )}
                   <button
                     type="button"

@@ -1,4 +1,4 @@
-import { apiClient } from './client'
+import { apiClient } from './client.js'
 
 export async function fetchProjects() {
   const { data } = await apiClient.get('/projects/')
@@ -18,22 +18,12 @@ export async function deleteProject(projectId) {
   return data.data
 }
 
-export async function fetchProjectAnalytics(
-  projectId,
-  bucket = 'day',
-  dateRange = {},
-) {
-  const [overview, documents, testCases, coverage, executions, executionTrends, risks, workflowMonitoring] = await Promise.all([
+export async function fetchProjectAnalytics(projectId) {
+  const [overview, documents, testCases, coverage, risks, workflowMonitoring] = await Promise.all([
     apiClient.get(`/analytics/overview/${projectId}`),
     apiClient.get(`/analytics/documents/${projectId}`),
     apiClient.get(`/analytics/test-cases/${projectId}`),
     apiClient.get(`/analytics/coverage/${projectId}`),
-    apiClient.get(`/analytics/executions/${projectId}`, {
-      params: dateRange,
-    }),
-    apiClient.get(`/analytics/execution-trends/${projectId}`, {
-      params: { bucket, ...dateRange },
-    }),
     apiClient.get(`/analytics/risks/${projectId}`),
     apiClient.get(`/analytics/workflows/${projectId}`),
   ])
@@ -42,8 +32,6 @@ export async function fetchProjectAnalytics(
     documents: documents.data,
     testCases: testCases.data,
     coverage: coverage.data,
-    executions: executions.data,
-    executionTrends: executionTrends.data,
     risks: risks.data,
     workflowMonitoring: workflowMonitoring.data,
   }
@@ -100,6 +88,25 @@ export async function updateProjectTestCase(projectId, testCaseId, changes) {
     throw new Error('Unexpected test case response.')
   }
   return testCase
+}
+
+async function updateProjectTestCaseReviewStatus(projectId, testCaseId, action) {
+  const { data } = await apiClient.patch(
+    `/projects/${projectId}/test-cases/${testCaseId}/${action}`,
+  )
+  const result = data?.data ?? data
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    throw new Error('Unexpected test case review response.')
+  }
+  return result
+}
+
+export function approveProjectTestCase(projectId, testCaseId) {
+  return updateProjectTestCaseReviewStatus(projectId, testCaseId, 'approve')
+}
+
+export function rejectProjectTestCase(projectId, testCaseId) {
+  return updateProjectTestCaseReviewStatus(projectId, testCaseId, 'reject')
 }
 
 export async function deleteProjectTestCase(projectId, testCaseId) {
