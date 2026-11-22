@@ -3,10 +3,16 @@ from datetime import datetime
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from app.api import analytics as analytics_api
+from app.database.connection import Base
 from app.models.organization import Organization
 from app.models.project import Project
+from app.models.test_case import TestCase as CaseModel
+from app.models.test_execution import TestExecutionRun as ExecutionRunModel
+from app.models.user import User
 from app.schemas.release_readiness_schema import ReleaseReadinessResponse
 from app.services.analytics_service import AnalyticsService
 from app.services.project_intelligence_service import ProjectIntelligenceService
@@ -282,8 +288,8 @@ class _OwnershipQuery:
         self.joins = []
         self.filters = []
 
-    def join(self, model):
-        self.joins.append(model)
+    def join(self, model, onclause=None):
+        self.joins.append((model, onclause))
         return self
 
     def filter(self, *conditions):
@@ -318,7 +324,10 @@ def test_project_intelligence_ownership_gate_checks_owner_scoped_project(owned):
             service.require_owned_project(4, 9)
 
     assert db.queried_model is Project
-    assert db.query_result.joins == [Organization]
+    assert len(db.query_result.joins) == 1
+    joined_model, onclause = db.query_result.joins[0]
+    assert joined_model is Organization
+    assert onclause.compare(Project.organitzation_id == Organization.id)
     assert len(db.query_result.filters) == 2
 
 
@@ -338,6 +347,97 @@ def test_release_service_rejects_another_users_project_before_analytics_queries(
         ReleaseReadinessService(db).get_project_release_readiness(4, 10)
 
     assert db.queried_model is Project
+
+
+def test_execution_health_counts_only_persisted_runs_for_the_selected_project():
+    # Import all model modules before metadata creation so SQLAlchemy can resolve
+    # the application's existing relationships in this isolated SQLite database.
+    import importlib
+    import pkgutil
+    import app.models
+
+    for module in pkgutil.iter_modules(app.models.__path__):
+        importlib.import_module(f"app.models.{module.name}")
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        user = User(name="Owner", email="release-owner@example.test", password_hash="test")
+        organization = Organization(name="Release test org", owner=user)
+        session.add(organization)
+        session.flush()
+        selected_project = Project(name="Selected", organitzation_id=organization.id)
+        other_project = Project(name="Other", organitzation_id=organization.id)
+        empty_project = Project(name="No runs", organitzation_id=organization.id)
+        session.add_all([selected_project, other_project, empty_project])
+        session.flush()
+
+        cases = []
+        for project, title in (
+            (selected_project, "Selected passed"),
+            (selected_project, "Selected failed"),
+            (other_project, "Other project run"),
+        ):
+            case = CaseModel(
+                project_id=project.id,
+                created_by_user_id=user.id,
+                title=title,
+                description="Persisted fixture case",
+                test_type="functional",
+                category="positive",
+                priority="medium",
+                severity="medium",
+                steps=[{"action": "Run", "expected_result": "Pass"}],
+                expected_result="Pass",
+                review_status="approved",
+            )
+            session.add(case)
+            cases.append(case)
+        session.flush()
+        session.add_all([
+            ExecutionRunModel(
+                project_id=selected_project.id,
+                test_case_id=cases[0].id,
+                executed_by_user_id=user.id,
+                status="passed",
+                duration_ms=10,
+                assertions=[],
+            ),
+            ExecutionRunModel(
+                project_id=selected_project.id,
+                test_case_id=cases[1].id,
+                executed_by_user_id=user.id,
+                status="failed",
+                duration_ms=None,
+                assertions=[],
+            ),
+            ExecutionRunModel(
+                project_id=other_project.id,
+                test_case_id=cases[2].id,
+                executed_by_user_id=user.id,
+                status="passed",
+                duration_ms=4,
+                assertions=[],
+            ),
+        ])
+        session.commit()
+
+        selected = AnalyticsService(session).get_execution_analytics(
+            selected_project.id,
+            user.id,
+        )
+        empty = AnalyticsService(session).get_execution_analytics(
+            empty_project.id,
+            user.id,
+        )
+
+    assert selected["total_runs"] == 2
+    assert selected["status_counts"]["passed"] == 1
+    assert selected["status_counts"]["failed"] == 1
+    assert selected["duration"]["average_ms"] == 10
+    assert empty["total_runs"] == 0
+    assert empty["duration"]["average_ms"] is None
+    assert empty["duration"]["median_ms"] is None
 
 
 def test_release_service_composes_existing_analytics_into_valid_response(monkeypatch):

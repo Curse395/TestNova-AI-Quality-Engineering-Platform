@@ -1,16 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import Navbar from '../components/layout/Navbar'
 import Card from '../components/ui/Card'
 import {
@@ -20,9 +9,11 @@ import {
 } from '../api/projects'
 import {
   formatAvailableMetric,
-  formatExecutionStatus,
+  qualityContextResult,
+  riskSeverityDisplay,
   RELEASE_STATES,
   sortReleaseConcerns,
+  testCaseHealthDistribution,
 } from './releaseReadinessPresentation'
 
 const STATE_STYLES = {
@@ -30,16 +21,6 @@ const STATE_STYLES = {
   attention_required: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
   blocked: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
   insufficient_evidence: 'border-slate-500/40 bg-slate-800 text-slate-200',
-}
-
-const STATUS_COLORS = {
-  passed: '#34d399',
-  failed: '#fb7185',
-  error: '#f97316',
-  skipped: '#fbbf24',
-  other: '#a78bfa',
-  missing: '#94a3b8',
-  blank: '#64748b',
 }
 
 const formatValue = formatAvailableMetric
@@ -116,10 +97,9 @@ export default function ReleaseReadinessPage() {
     try {
       const result = await generateProjectQualitySummary(Number(projectId))
       if (summaryRequestId.current !== requestId) return
-      setSummary(result)
-      if (result.status !== 'available') {
-        setSummaryError(result.error || 'An evidence-validated AI summary is unavailable.')
-      }
+      const normalized = qualityContextResult(result)
+      setSummary(normalized.result)
+      setSummaryError(normalized.error)
     } catch (requestError) {
       if (summaryRequestId.current !== requestId) return
       if (requestError?.response?.status === 401) navigate('/login', { replace: true })
@@ -134,8 +114,8 @@ export default function ReleaseReadinessPage() {
   const cases = metrics?.test_cases
   const traceability = metrics?.requirement_traceability
   const executions = metrics?.executions
-  const trends = executions?.trends?.buckets || []
   const risks = metrics?.risks
+  const severityDisplay = riskSeverityDisplay(risks?.severity_counts)
   const workflows = metrics?.workflows
   const assessment = data?.assessment
 
@@ -210,11 +190,11 @@ export default function ReleaseReadinessPage() {
                   <Metric label="Rejected" value={cases?.review_status_counts?.rejected} />
                 </div>
                 <div className="mt-5 grid gap-5 md:grid-cols-2">
-                  <Distribution title="Cases by category" counts={cases?.category_counts} />
-                  <Distribution title="Cases by priority" counts={cases?.priority_counts} />
+                  <Distribution title="Cases by category" counts={testCaseHealthDistribution(cases?.category_counts, 'category')} />
+                  <Distribution title="Cases by priority" counts={testCaseHealthDistribution(cases?.priority_counts, 'priority')} />
                 </div>
                 <p className="mt-4 text-xs text-slate-500">
-                  Missing and unexpected category, priority, and review values remain separate in the distributions.
+                  Distributions show supported categories and priorities; persisted test cases remain unchanged.
                 </p>
                 <PageLink to="/test-cases">Review test cases</PageLink>
               </Card>
@@ -236,109 +216,97 @@ export default function ReleaseReadinessPage() {
               </Card>
             </section>
 
-            <Card title="Execution health" subtitle="Counts represent persisted execution runs, including repeated runs of the same case.">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Metric label="Execution runs" value={executions?.total_runs} />
-                <Metric label="Pass rate (passed / passed + failed)" value={formatPercent(executions?.pass_rate)} />
-                <Metric label="Average duration (valid only)" value={duration(executions?.duration?.average_ms)} />
-                <Metric label="Median duration (valid only)" value={duration(executions?.duration?.median_ms)} />
-              </div>
-              <p className="mt-3 text-xs text-slate-400">
-                Valid durations: {formatValue(executions?.duration?.observed_run_count)} · unavailable or invalid: {formatValue(executions?.duration?.unavailable_run_count)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Lifetime evidence range: {dateOnly(executions?.time_range?.first_execution_at)} – {dateOnly(executions?.time_range?.latest_execution_at)} · recent activity shows at most 10 runs.
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {Object.entries(executions?.status_counts || {}).map(([status, count]) => (
-                  <span key={status} className="rounded-full border border-slate-700 px-3 py-1 text-xs" style={{ color: STATUS_COLORS[status] || '#cbd5e1' }}>
-                    {status}: {count}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-6 grid gap-6 xl:grid-cols-2">
-                <TrendChart title="Execution runs by day (last 30 days)" data={trends} dataKey="run_count" color="#38bdf8" unit="runs" />
-                <TrendChart title="Pass rate by day (determinate runs only)" data={trends} dataKey="pass_rate" color="#34d399" unit="%" />
-              </div>
-              {executions?.recent_runs?.length ? (
-                <div className="mt-5 overflow-x-auto">
-                  <h3 className="mb-2 text-sm font-medium text-slate-200">Recent execution activity</h3>
-                  <table className="w-full min-w-[32rem] text-left text-xs">
-                    <thead className="text-slate-500"><tr><th className="p-2">Run</th><th className="p-2">Status</th><th className="p-2">UTC time</th></tr></thead>
-                    <tbody>
-                      {executions.recent_runs.map((run) => (
-                        <tr key={run.id} className="border-t border-slate-800">
-                          <td className="p-2">#{run.id}</td>
-                          <td className="p-2">{formatExecutionStatus(run.status)}</td>
-                          <td className="p-2">{run.created_at ? run.created_at.replace('T', ' ').replace('+00:00', ' UTC') : 'Unavailable'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="mt-5 text-sm text-slate-400">No persisted execution runs are available; this is not a 100% pass rate.</p>
-              )}
-            </Card>
-
             <section aria-label="Risk and workflow health" className="grid gap-6 xl:grid-cols-2">
-              <Card title="Risk overview" subtitle="Assessed severity is not a numerical probability. AI-inferred findings are distinct from observed execution facts.">
-                {risks?.risk_count ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Distribution title="Findings by assessed severity" counts={risks.severity_counts} />
-                      <Distribution title="Findings by category" counts={risks.category_counts} />
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      {(risks.risks || []).slice(0, 10).map((risk) => (
-                        <article key={risk.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                          <p className="text-sm font-medium text-slate-100">{risk.description}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            {risk.kind === 'ai_inferred' ? 'AI-inferred' : 'Observed fact'} · {risk.severity} · {risk.category?.replaceAll('_', ' ')}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-300">{risk.explanation}</p>
-                          {risk.evidence_references?.length > 0 && (
-                            <p className="mt-2 break-all text-xs text-sky-200">Evidence: {risk.evidence_references.map((item) => item.label || item.id).join(', ')}</p>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                    {(risks.risk_findings_truncated || risks.risk_task_window_truncated) && (
-                      <p className="mt-3 text-xs text-amber-200">Risk history is bounded; older persisted assessments may be omitted.</p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-slate-400">{risks?.unavailable_reason || 'No persisted risk findings are available; absence of findings is not proof of no risk.'}</p>
+              <Card title="Risk overview" subtitle="Severity is an assessment, not a probability. AI-inferred findings are distinct from observed execution facts.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Distribution title="Findings by assessed severity" counts={severityDisplay.supported} />
+                  <Distribution title="Findings by category" counts={risks?.category_counts} />
+                </div>
+                {severityDisplay.additional.length > 0 && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Additional severity classifications, not mapped to supported levels: {severityDisplay.additional.map(([name, count]) => `${name}: ${count}`).join(', ')}.
+                  </p>
                 )}
+                <details className="group mt-4 border-t border-slate-800 pt-3">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg py-1 outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                    <span className="text-xs font-medium text-slate-300">
+                      Individual risk findings ({risks?.returned_risk_count ?? risks?.risks?.length ?? 0})
+                    </span>
+                    <span className="shrink-0 text-xs text-sky-300">
+                      <span className="group-open:hidden">Expand findings</span>
+                      <span className="hidden group-open:inline">Collapse findings</span>
+                    </span>
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {risks?.risk_count ? (
+                      (risks.risks || []).map((risk, index) => (
+                        <details key={risk.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                            <span className="font-medium text-slate-100">{risk.title || `Risk finding ${index + 1}`}</span>
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-200">{risk.severity || 'Unclassified'}</span>
+                              <span className="text-xs text-slate-400">{risk.category?.replaceAll('_', ' ') || 'Category unavailable'}</span>
+                            </span>
+                          </summary>
+                          <div className="mt-3 space-y-2 border-t border-slate-800 pt-3 text-sm">
+                            <p className="text-slate-300"><span className="text-slate-500">Description: </span>{risk.description || 'Unavailable'}</p>
+                            <p className="text-slate-300"><span className="text-slate-500">Finding type: </span>{risk.kind === 'ai_inferred' ? 'AI-inferred' : risk.kind === 'observed_fact' ? 'Observed fact' : risk.kind || 'Unavailable'}</p>
+                            {risk.explanation && <p className="text-slate-300"><span className="text-slate-500">Assessment details: </span>{risk.explanation}</p>}
+                            {risk.potential_impact?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-slate-400">Potential impact</p>
+                                <ul className="mt-1 list-disc space-y-1 pl-5 text-slate-300">
+                                  {risk.potential_impact.map((impact, impactIndex) => <li key={`${risk.id}-impact-${impactIndex}`}>{impact}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {(risk.source_workflow_id != null || risk.source_task_id != null) && (
+                              <p className="text-xs text-slate-400">Source workflow: {risk.source_workflow_id ?? 'Unavailable'}; task: {risk.source_task_id ?? 'Unavailable'}</p>
+                            )}
+                            {risk.assessed_at && <p className="text-xs text-slate-400">Assessed at: {risk.assessed_at}</p>}
+                            {risk.severity_basis && <p className="text-xs text-slate-400">Severity basis: {risk.severity_basis}</p>}
+                            {risk.evidence_references?.length > 0 ? (
+                              <div>
+                                <p className="text-xs font-medium text-slate-400">Evidence references</p>
+                                <ul className="mt-1 space-y-1 text-xs text-sky-200">
+                                  {risk.evidence_references.map((reference, refIndex) => (
+                                    <li key={`${risk.id}-evidence-${reference.id || refIndex}`} className="break-all">
+                                      {reference.label || reference.id || 'Evidence reference'}{reference.kind ? ` (${reference.kind})` : ''}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : <p className="text-xs text-slate-400">No evidence references are available.</p>}
+                            <p className="text-xs text-slate-400">Supporting document evidence: {risk.supporting_evidence_available == null ? 'Unavailable' : risk.supporting_evidence_available ? 'Available' : 'Unavailable'}</p>
+                            {risk.evidence_note && <p className="text-xs text-slate-400">Evidence note: {risk.evidence_note}</p>}
+                            {risk.evidence_reference_count != null && <p className="text-xs text-slate-400">Evidence reference count: {risk.evidence_reference_count}{risk.evidence_references_truncated ? ' (reference list truncated)' : ''}</p>}
+                          </div>
+                        </details>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-400">{risks?.unavailable_reason || 'No persisted risk findings are available; absence of findings is not proof of no risk.'}</p>
+                    )}
+                    {(risks?.risk_findings_truncated || risks?.risk_task_window_truncated) && (
+                      <p className="pt-1 text-xs text-amber-200">Risk history is bounded; older persisted assessments may be omitted.</p>
+                    )}
+                  </div>
+                </details>
               </Card>
 
               <Card title="Agent and workflow health" subtitle="Persisted workflow snapshots, not a live monitoring feed.">
-                {workflows?.workflow_count ? (
-                  <>
-                    <p className="mb-3 text-xs text-slate-500">
-                      Status, failed-task, retry, and attempt counts cover the latest {workflows.sample_limit} workflow snapshots only.
-                    </p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {Object.entries(workflows.workflow_status_counts || {}).map(([status, count]) => (
-                        <Metric key={status} label={`Workflows: ${status.replaceAll('_', ' ')}`} value={count} />
-                      ))}
-                      <Metric label="Failed tasks (snapshot)" value={workflows.failed_task_count} />
-                      <Metric label="Retried tasks (snapshot)" value={workflows.retried_task_count} />
-                      <Metric label="Recorded attempts" value={workflows.attempt_count} />
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      {workflows.workflows.map((workflow) => (
-                        <article key={workflow.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                          <p className="text-sm font-medium">Workflow #{workflow.id} · {workflow.workflow_type.replaceAll('_', ' ')}</p>
-                          <p className="mt-1 text-xs text-slate-400">
-                            Workflow status: {workflow.status} · tasks: {workflow.task_count} · failed tasks: {workflow.failed_task_count} · retried tasks: {workflow.retried_task_count} · duration: {duration(workflow.duration_ms)}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-slate-400">No persisted workflow history is available for this project.</p>
+                <p className="mb-3 text-xs text-slate-500">
+                  Status, failed-task, retry, and attempt counts cover the latest {workflows?.sample_limit ?? 20} workflow snapshots only.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {['pending', 'running', 'completed', 'partially_completed', 'failed', 'other'].map((status) => (
+                    <Metric key={status} label={`Workflows: ${status.replaceAll('_', ' ')}`} value={workflows?.workflow_status_counts?.[status]} />
+                  ))}
+                  <Metric label="Failed tasks (snapshot)" value={workflows?.failed_task_count} />
+                  <Metric label="Retried tasks (snapshot)" value={workflows?.retried_task_count} />
+                  <Metric label="Recorded attempts" value={workflows?.attempt_count} />
+                </div>
+                {workflows?.workflow_count === 0 && (
+                  <p className="mt-3 text-sm text-slate-400">No persisted workflow history is available for this project.</p>
                 )}
                 <PageLink to="/workflows">Inspect workflows and agent tasks</PageLink>
               </Card>
@@ -348,18 +316,20 @@ export default function ReleaseReadinessPage() {
               {data.concerns?.length ? (
                 <div className="space-y-3">
                   {sortReleaseConcerns(data.concerns).map((concern) => (
-                    <article key={concern.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-medium text-slate-100">{concern.title}</h3>
-                        <span className={`rounded-full px-2.5 py-1 text-xs ${attentionStyle(concern.attention)}`}>{concern.attention}</span>
+                    <details key={concern.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                        <span className="font-medium text-slate-100">{concern.title}</span>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs ${attentionStyle(concern.attention)}`}>{concern.attention}</span>
+                      </summary>
+                      <div className="mt-3 border-t border-slate-800 pt-3">
+                        <p className="text-sm text-slate-300">{concern.explanation}</p>
+                        <p className="mt-2 text-xs text-slate-500">Source: {concern.source}</p>
+                        {concern.evidence_ids?.length > 0 && (
+                          <p className="mt-1 break-all text-xs text-sky-200">Evidence: {concern.evidence_ids.join(', ')}</p>
+                        )}
+                        <p className="mt-2 text-sm text-slate-400">Next: {concern.next_action}</p>
                       </div>
-                      <p className="mt-2 text-sm text-slate-300">{concern.explanation}</p>
-                      <p className="mt-2 text-xs text-slate-500">Source: {concern.source}</p>
-                      {concern.evidence_ids?.length > 0 && (
-                        <p className="mt-1 break-all text-xs text-sky-200">Evidence: {concern.evidence_ids.join(', ')}</p>
-                      )}
-                      <p className="mt-2 text-sm text-slate-400">Next: {concern.next_action}</p>
-                    </article>
+                    </details>
                   ))}
                 </div>
               ) : (
@@ -377,7 +347,7 @@ export default function ReleaseReadinessPage() {
                 disabled={summaryLoading}
                 className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-50"
               >
-                {summaryLoading ? 'Generating…' : summary ? 'Refresh AI quality context' : 'Generate AI quality context'}
+                {summaryLoading ? 'Generating…' : summary?.status === 'available' ? 'Refresh AI quality context' : 'Generate AI quality context'}
               </button>
               {summary?.status === 'available' && (
                 <p className="mt-3 text-xs text-slate-500">
@@ -457,44 +427,6 @@ function Rate({ label, value }) {
   )
 }
 
-function TrendChart({ title, data, dataKey, color, unit }) {
-  const points = data.map((item) => ({
-    ...item,
-    label: dateOnly(item.start),
-    value: item[dataKey],
-  }))
-  return (
-    <div>
-      <h3 className="mb-2 text-sm font-medium text-slate-200">{title}</h3>
-      {!points.some((item) => item.value != null) ? (
-        <p className="flex h-48 items-center justify-center text-sm text-slate-500">No determinate trend data is available.</p>
-      ) : (
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            {dataKey === 'run_count' ? (
-              <BarChart data={points}>
-                <CartesianGrid stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <YAxis allowDecimals={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <Tooltip formatter={(value) => [`${value} ${unit}`, title]} />
-                <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            ) : (
-              <LineChart data={points}>
-                <CartesianGrid stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} unit="%" />
-                <Tooltip formatter={(value) => [value == null ? 'Unavailable' : `${value}${unit}`, title]} />
-                <Line type="monotone" dataKey="value" stroke={color} connectNulls={false} dot={false} />
-              </LineChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function SummaryGroup({ title, items }) {
   if (!items?.length) return null
   return (
@@ -516,10 +448,6 @@ function SummaryGroup({ title, items }) {
 
 function PageLink({ to, children }) {
   return <Link to={to} className="mt-4 inline-block text-sm text-sky-300 hover:text-sky-200">{children} →</Link>
-}
-
-function duration(value) {
-  return value == null ? 'Unavailable' : `${value} ms`
 }
 
 function attentionStyle(attention) {
