@@ -1,42 +1,90 @@
-# Virtual Environments
-venv/
-myenv/
+# Environment files and credentials. Keep the documented safe template.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.secret
+*.credentials
+secrets.*
 
-# Python
+# Python environments and caches
+venv/
+.venv/
+myenv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
 
-# Environment Variables
-.env
+# Node and frontend output
+node_modules/
+dist/
+dist-ssr/
+.vite/
+.cache/
+*.local
 
-# SQLite
+# Logs, telemetry and temporary artifacts
+*.log
+*.log.*
+*.jsonl
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Local databases and backups
 *.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.dump
+*.backup
+*.bak.sql
+*.sql.gz
 
-# Uploads
+# Local uploads and generated user data (keep source fixtures/datasets tracked)
 backend/app/uploads/
+backend/uploads/
+backend/user_data/
+backend/generated_data/
+backend/evaluation_results/*
+!backend/evaluation_results/.gitkeep
+backend/data/llm_telemetry.jsonl
+uploads/
+user_uploads/
+user_data/
+generated_data/
 
-# IDE
+# Model and embedding caches
+models/
+model_cache/
+embeddings_cache/
+.model-cache/
+.embedding-cache/
+**/sentence_transformers/
+**/.cache/huggingface/
+
+# IDE and operating system files
 .vscode/
 .idea/
-
-# OS
+.vs/
+.fleet/
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Test databases
-*.db
-
-# Patch / review files
+# Local patch and inspection artifacts
 *.diff
-
-# Temporary inspection files
 inspect_response.py
 inspect_responses.py
-
-# Python cache
-.pytest_cache/
-
-# Virtual environments
-myenv/
-.venv/
