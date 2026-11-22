@@ -67,14 +67,10 @@ user_data/
 generated_data/
 
 # Model and embedding caches
-models/
 model_cache/
 embeddings_cache/
 .model-cache/
 .embedding-cache/
-# The application source package is named models; never ignore it.
-!backend/app/models/
-!backend/app/models/**
 **/sentence_transformers/
 **/.cache/huggingface/
 
