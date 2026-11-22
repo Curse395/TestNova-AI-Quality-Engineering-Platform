@@ -13,6 +13,7 @@ from app.schemas.test_case_schema import (
     TestCaseUpdate,
 )
 from app.services.project_service import ProjectService
+from app.services.workflow_validation_service import WorkflowValidationService
 from app.agents.test_generation_agent import TestGenerationAgent
 from app.services.test_case_evaluation_service import TestCaseEvaluationService
 from app.agents.contracts import AgentContext
@@ -533,28 +534,79 @@ def evaluate_test_case_generation_run(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-#Manually checked the code by me
-
-
 @router.patch("/{project_id}/test-cases/{test_case_id}/approve")
-def approve_test_case(project_id:int,test_case_id:int,current_user:CurrentUser,db:Session=Depends(get_db)):
+def approve_test_case(
+    project_id: int,
+    test_case_id: int,
+    current_user: CurrentUser,
+    db: Session = Depends(get_db),
+):
     project = get_owned_project(db, project_id, current_user.id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found or access denied.")
 
-    if not project:
-        raise HTTPException(status_code=404,detail="Project not found or access denied.")
-
-    test_case = (db.query(TestCase).filter(TestCase.id==test_case_id,TestCase.project_id==project_id).first())
-
-    if not test_case:
-        raise HTTPException(status_code=404,detail="Test case not found.")
+    test_case = (
+        db.query(TestCase)
+        .filter(TestCase.id == test_case_id, TestCase.project_id == project_id)
+        .first()
+    )
+    if test_case is None:
+        raise HTTPException(status_code=404, detail="Test case not found.")
 
     if test_case.review_status == "approved":
         return {
             "success": True,
             "message": "Test case is already approved.",
             "test_case_id": test_case.id,
-            "review_status": "approved"
+            "review_status": "approved",
         }
+
+    evidence_links = (
+        db.query(TestCaseEvidence)
+        .filter(TestCaseEvidence.test_case_id == test_case.id)
+        .all()
+    )
+    validation = WorkflowValidationService(db).validate(
+        user_id=current_user.id,
+        project_id=project_id,
+        test_case_ids=[test_case.id],
+    )
+    findings = validation["findings"]
+    if not evidence_links:
+        # Explicit manual approval remains available for saved cases without
+        # evidence, but all structural checks must still pass.
+        findings = [item for item in findings if item.get("check") != "evidence"]
+    if findings:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "Test case failed deterministic validation.",
+                "findings": findings,
+            },
+        )
+
+    if evidence_links:
+        try:
+            review_result = TestCaseEvaluationService(db).evaluate(
+                user_id=current_user.id,
+                project_id=project_id,
+                test_case_id=test_case.id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Test case evaluation could not be completed.",
+            ) from exc
+        if review_result.get("recommendation") == "needs_revision":
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Test case evaluation recommends revision.",
+                    "findings": review_result.get("findings", []),
+                },
+            )
 
     test_case.review_status = "approved"
 
@@ -563,14 +615,14 @@ def approve_test_case(project_id:int,test_case_id:int,current_user:CurrentUser,d
         db.refresh(test_case)
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=500,detail="Failed to approve test case.")
+        raise HTTPException(status_code=500, detail="Failed to approve test case.") from None
 
     return {
         "success": True,
         "message": "Test case approved successfully.",
         "test_case_id": test_case.id,
         "project_id": project_id,
-        "review_status": test_case.review_status
+        "review_status": test_case.review_status,
     }
 
 
