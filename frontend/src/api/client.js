@@ -4,7 +4,9 @@ import { getApiErrorMessage, handleUnauthorizedResponse } from './errorMessage.j
 
 export { getApiErrorMessage }
 
-const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8000'
+// Vercel proxies the FastAPI function at /api. Local development can still
+// point VITE_API_BASE_URL at the directly running backend.
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || '/api'
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
